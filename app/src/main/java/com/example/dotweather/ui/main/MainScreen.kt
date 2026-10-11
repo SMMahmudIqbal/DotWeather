@@ -1,5 +1,10 @@
 package com.example.dotweather.ui.main
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -60,7 +65,7 @@ fun MainScreen(
 ) {
     var selectedCityIndex by remember { mutableIntStateOf(0) }
     var isCelsius by remember { mutableStateOf(true) }
-    var selectedTab by remember { mutableIntStateOf(0) } // 0: OVERVIEW, 1: AIR QUALITY, 2: 7-DAY
+    var selectedTab by remember { mutableIntStateOf(0) } // 0: HOURLY, 1: AIR QUALITY, 2: 7-DAY
 
     val currentCity = WeatherRepository.sampleCities[selectedCityIndex]
 
@@ -74,12 +79,12 @@ fun MainScreen(
         modifier = modifier
             .fillMaxSize()
             .background(NothingBlack)
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 18.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // --- 1. NOTHING OS HEADER & CITY SELECTOR ---
         item {
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(14.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -90,7 +95,7 @@ fun MainScreen(
                         // Iconic Nothing Red Recording Dot
                         Box(
                             modifier = Modifier
-                                .size(8.dp)
+                                .size(7.dp)
                                 .clip(CircleShape)
                                 .background(NothingRed)
                         )
@@ -104,6 +109,7 @@ fun MainScreen(
                             letterSpacing = 1.2.sp
                         )
                     }
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
                         text = "Developed by S. M. Mahmud Iqbal",
                         color = NothingWhite40,
@@ -126,7 +132,7 @@ fun MainScreen(
                             .clip(RoundedCornerShape(16.dp))
                             .background(if (isCelsius) NothingWhite else Color.Transparent)
                             .clickable { isCelsius = true }
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                            .padding(horizontal = 11.dp, vertical = 5.dp)
                     ) {
                         Text(
                             text = "°C",
@@ -141,7 +147,7 @@ fun MainScreen(
                             .clip(RoundedCornerShape(16.dp))
                             .background(if (!isCelsius) NothingWhite else Color.Transparent)
                             .clickable { isCelsius = false }
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                            .padding(horizontal = 11.dp, vertical = 5.dp)
                     ) {
                         Text(
                             text = "°F",
@@ -209,7 +215,7 @@ fun MainScreen(
                                 fontSize = 24.sp,
                                 letterSpacing = 1.5.sp
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(3.dp))
                             Text(
                                 text = currentCity.conditionDesc,
                                 color = NothingWhite40,
@@ -224,14 +230,20 @@ fun MainScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(18.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                    // Dot Matrix Digital Temperature Display
-                    NDotText(
-                        text = "$displayTemp°",
-                        modifier = Modifier.fillMaxWidth(),
-                        height = 60.dp
-                    )
+                    // Animated Dot Matrix Digital Temperature Display
+                    AnimatedContent(
+                        targetState = "$displayTemp°",
+                        transitionSpec = { fadeIn(tween(180)) togetherWith fadeOut(tween(180)) },
+                        label = "temp_anim"
+                    ) { targetText ->
+                        NDotText(
+                            text = targetText,
+                            modifier = Modifier.fillMaxWidth(),
+                            height = 58.dp
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(18.dp))
 
@@ -250,12 +262,11 @@ fun MainScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Box(
                                 modifier = Modifier
-                                    .size(6.dp)
+                                    .size(5.dp)
                                     .clip(CircleShape)
                                     .background(NothingRed)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
-                            // FIXED: string interpolation with braces
                             Text(
                                 text = "FEELS ${displayFeelsLike}$unitSymbol",
                                 color = NothingWhite40,
@@ -268,7 +279,7 @@ fun MainScreen(
             }
         }
 
-        // --- 4. TAB SELECTOR (OVERVIEW / AIR / 7-DAY) ---
+        // --- 4. TAB SELECTOR (HOURLY / AIR / 7-DAY) ---
         item {
             Row(
                 modifier = Modifier
@@ -305,7 +316,7 @@ fun MainScreen(
         // --- 5. TAB CONTENT ---
         when (selectedTab) {
             0 -> {
-                // HOURLY CAROUSEL
+                // HOURLY TIMELINE
                 item {
                     Text(
                         text = "HOURLY TIMELINE",
@@ -355,6 +366,8 @@ fun MainScreen(
                                             fontFamily = FontFamily.Monospace,
                                             fontSize = 10.sp
                                         )
+                                    } else {
+                                        Spacer(modifier = Modifier.height(18.dp))
                                     }
                                 }
                             }
@@ -362,7 +375,7 @@ fun MainScreen(
                     }
                 }
 
-                // ENVIRONMENTAL METRICS GRID
+                // ENVIRONMENTAL SENSORS
                 item {
                     Text(
                         text = "ENVIRONMENTAL SENSORS",
@@ -384,7 +397,7 @@ fun MainScreen(
                             Column {
                                 Text("WIND SPEED", color = NothingWhite40, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Text("${currentCity.windSpeed} km/h", color = NothingWhite, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                Text("${currentCity.windSpeed} km/h", color = NothingWhite, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 17.sp)
                                 Text("DIR: ${currentCity.windDirection}", color = NothingWhite70, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                             }
                         }
@@ -396,7 +409,7 @@ fun MainScreen(
                             Column {
                                 Text("HUMIDITY", color = NothingWhite40, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Text("${currentCity.humidity}%", color = NothingWhite, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                Text("${currentCity.humidity}%", color = NothingWhite, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 17.sp)
                                 Text("DEW POINT 11°", color = NothingWhite70, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                             }
                         }
@@ -416,7 +429,7 @@ fun MainScreen(
                             Column {
                                 Text("UV INDEX", color = NothingWhite40, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Text("${currentCity.uvIndex}", color = NothingWhite, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                Text("${currentCity.uvIndex}", color = NothingWhite, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 17.sp)
                                 Text(if (currentCity.uvIndex > 5) "HIGH EXPOSURE" else "LOW RISK", color = NothingWhite70, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                             }
                         }
@@ -428,7 +441,7 @@ fun MainScreen(
                             Column {
                                 Text("BAROMETER", color = NothingWhite40, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                                 Spacer(modifier = Modifier.height(8.dp))
-                                Text("${currentCity.pressureHpa} hPa", color = NothingWhite, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                                Text("${currentCity.pressureHpa} hPa", color = NothingWhite, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 17.sp)
                                 Text("STEADY", color = NothingWhite70, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                             }
                         }
@@ -464,7 +477,7 @@ fun MainScreen(
                             Spacer(modifier = Modifier.height(14.dp))
                             NDotText(
                                 text = "${currentCity.airQuality.aqi}",
-                                height = 52.dp,
+                                height = 50.dp,
                                 modifier = Modifier.fillMaxWidth()
                             )
                             Spacer(modifier = Modifier.height(16.dp))
@@ -593,7 +606,7 @@ fun MainScreen(
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(32.dp))
         }
     }
 }

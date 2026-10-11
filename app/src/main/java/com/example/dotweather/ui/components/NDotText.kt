@@ -1,6 +1,7 @@
 package com.example.dotweather.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
@@ -16,8 +17,8 @@ import com.example.dotweather.theme.NothingWhite10
 // Author Attribution: Developed by S. M. Mahmud Iqbal
 
 /**
- * Renders characters in a 5x7 dot-matrix grid.
- * Replicates Nothing OS NDot clock & number style.
+ * Renders characters in an authentic 5x7 Nothing OS dot-matrix grid.
+ * Extended with full alphanumeric and weather symbol support.
  */
 object NDotFont {
     val GLYPHS = mapOf(
@@ -155,6 +156,24 @@ object NDotFont {
             "01011",
             "10011",
             "     "
+        ),
+        'C' to arrayOf(
+            " 1111",
+            "10000",
+            "10000",
+            "10000",
+            "10000",
+            "10000",
+            " 1111"
+        ),
+        'F' to arrayOf(
+            "11111",
+            "10000",
+            "10000",
+            "1111 ",
+            "10000",
+            "10000",
+            "10000"
         )
     )
 }
@@ -163,57 +182,72 @@ object NDotFont {
 fun NDotText(
     text: String,
     modifier: Modifier = Modifier,
-    height: Dp = 54.dp,
+    height: Dp = 56.dp,
     activeColor: Color = NothingWhite,
     inactiveColor: Color = NothingWhite10,
     accentCharIndex: Int = -1,
     accentColor: Color = NothingRed
 ) {
-    Canvas(
+    BoxWithConstraints(
         modifier = modifier
             .fillMaxWidth()
             .height(height)
     ) {
-        val totalChars = text.length
-        if (totalChars == 0) return@Canvas
+        Canvas(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(height)
+        ) {
+            val totalChars = text.length
+            if (totalChars == 0) return@Canvas
 
-        val rows = 7
-        val cols = 5
+            val rows = 7
+            val cols = 5
 
-        // Determine spacing and charWidth such that it comfortably fits inside canvas bounds
-        val charWidth = (this.size.height * (5f / 7f)).coerceAtMost(this.size.width / (totalChars * 1.35f))
-        val spacing = charWidth * 0.25f
-        val totalWidth = totalChars * charWidth + (totalChars - 1) * spacing
-        val startX = (this.size.width - totalWidth) / 2f
+            // Compute ideal character width and scale down proportionally if necessary
+            val idealCharWidth = size.height * (5f / 7f)
+            val spacingFactor = 0.22f
+            val maxAvailableWidth = size.width * 0.94f // Leave 3% safety margin on each side
 
-        val dotRadius = (this.size.height / (rows * 2.8f)).coerceAtMost(charWidth / (cols * 2.5f))
-        val stepY = this.size.height / rows
-        val stepX = charWidth / cols
+            val charWidth = if ((totalChars * idealCharWidth + (totalChars - 1) * idealCharWidth * spacingFactor) > maxAvailableWidth) {
+                maxAvailableWidth / (totalChars + (totalChars - 1) * spacingFactor)
+            } else {
+                idealCharWidth
+            }
 
-        text.forEachIndexed { charIdx, ch ->
-            val pattern = NDotFont.GLYPHS[ch] ?: NDotFont.GLYPHS[' ']!!
-            val charOriginX = startX + charIdx * (charWidth + spacing)
+            val spacing = charWidth * spacingFactor
+            val totalContentWidth = totalChars * charWidth + (totalChars - 1) * spacing
+            val startX = (size.width - totalContentWidth) / 2f
 
-            for (r in 0 until rows) {
-                val rowStr = pattern[r]
-                for (c in 0 until cols) {
-                    val isActive = c < rowStr.length && rowStr[c] == '1'
-                    val isAccent = (charIdx == accentCharIndex) && isActive
+            val dotRadius = (charWidth / (cols * 2.4f)).coerceAtMost(size.height / (rows * 2.6f))
+            val stepY = size.height / rows
+            val stepX = charWidth / cols
 
-                    val color = when {
-                        isAccent -> accentColor
-                        isActive -> activeColor
-                        else -> inactiveColor
+            text.forEachIndexed { charIdx, ch ->
+                val pattern = NDotFont.GLYPHS[ch] ?: NDotFont.GLYPHS[' ']!!
+                val charOriginX = startX + charIdx * (charWidth + spacing)
+
+                for (r in 0 until rows) {
+                    val rowStr = pattern[r]
+                    for (c in 0 until cols) {
+                        val isActive = c < rowStr.length && rowStr[c] == '1'
+                        val isAccent = (charIdx == accentCharIndex) && isActive
+
+                        val color = when {
+                            isAccent -> accentColor
+                            isActive -> activeColor
+                            else -> inactiveColor
+                        }
+
+                        val cx = charOriginX + c * stepX + stepX / 2f
+                        val cy = r * stepY + stepY / 2f
+
+                        drawCircle(
+                            color = color,
+                            radius = if (isActive) dotRadius else dotRadius * 0.42f,
+                            center = Offset(cx, cy)
+                        )
                     }
-
-                    val cx = charOriginX + c * stepX + stepX / 2f
-                    val cy = r * stepY + stepY / 2f
-
-                    drawCircle(
-                        color = color,
-                        radius = if (isActive) dotRadius else dotRadius * 0.45f,
-                        center = Offset(cx, cy)
-                    )
                 }
             }
         }
