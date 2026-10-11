@@ -28,13 +28,16 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,6 +48,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.dotweather.data.CityWeather
+import com.example.dotweather.data.WeatherApiClient
 import com.example.dotweather.data.WeatherRepository
 import com.example.dotweather.theme.NothingBlack
 import com.example.dotweather.theme.NothingCardBg
@@ -60,6 +64,7 @@ import com.example.dotweather.ui.components.DotMatrixIcon
 import com.example.dotweather.ui.components.LocationSearchCard
 import com.example.dotweather.ui.components.NDotText
 import com.example.dotweather.ui.components.NothingCard
+import kotlinx.coroutines.launch
 
 // Developed by S. M. Mahmud Iqbal
 
@@ -68,12 +73,35 @@ fun MainScreen(
     onItemClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    var citiesList by remember { mutableStateOf(WeatherRepository.predefinedCities) }
+    val coroutineScope = rememberCoroutineScope()
+    var citiesList by remember { mutableStateOf(WeatherRepository.defaultFallbackCities) }
     var selectedCityIndex by remember { mutableIntStateOf(0) }
     var isCelsius by remember { mutableStateOf(true) }
     var selectedTab by remember { mutableIntStateOf(0) } // 0: HOURLY, 1: AIR QUALITY, 2: 7-DAY
     var isSearchExpanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var isRefreshing by remember { mutableStateOf(false) }
+    var networkErrorMsg by remember { mutableStateOf<String?>(null) }
+
+    // Initial Live Load: Fetch real-time data for initial world cities asynchronously
+    LaunchedEffect(Unit) {
+        isRefreshing = true
+        val fetchedList = mutableListOf<CityWeather>()
+        for (target in WeatherRepository.initialTargets) {
+            val liveData = WeatherApiClient.fetchLiveWeather(
+                name = target.name,
+                country = target.country,
+                latitude = target.lat,
+                longitude = target.lon,
+                isCustom = false
+            )
+            if (liveData != null) {
+                fetchedList.add(liveData)
+                citiesList = fetchedList.toList()
+            }
+        }
+        isRefreshing = false
+    }
 
     val currentCity = citiesList.getOrElse(selectedCityIndex) { citiesList[0] }
 
@@ -108,7 +136,7 @@ fun MainScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "DOTWEATHER // AIR",
+                            text = "DOTWEATHER // LIVE",
                             color = NothingWhite70,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
@@ -205,16 +233,82 @@ fun MainScreen(
                     onSearchSubmit = { query ->
                         val trimmed = query.trim()
                         if (trimmed.isNotEmpty()) {
-                            val newCity = WeatherRepository.createWeatherForLocation(trimmed)
-                            // Prepend new city to list so user immediately sees it
-                            citiesList = listOf(newCity) + citiesList
-                            selectedCityIndex = 0
-                            searchQuery = ""
-                            isSearchExpanded = false
+                            coroutineScope.launch {
+                                isRefreshing = true
+                                networkErrorMsg = null
+                                val geo = WeatherApiClient.searchGeocoding(trimmed)
+                                if (geo != null) {
+                                    val liveWeather = WeatherApiClient.fetchLiveWeather(
+                                        name = geo.name,
+                                        country = geo.country,
+                                        latitude = geo.latitude,
+                                        longitude = geo.longitude,
+                                        isCustom = true
+                                    )
+                                    if (liveWeather != null) {
+                                        citiesList = listOf(liveWeather) + citiesList
+                                        selectedCityIndex = 0
+                                        searchQuery = ""
+                                        isSearchExpanded = false
+                                    } else {
+                                        networkErrorMsg = "FAILED TO FETCH WEATHER TELEMETRY"
+                                    }
+                                } else {
+                                    networkErrorMsg = "LOCATION NOT FOUND. CHECK SPELLING."
+                                }
+                                isRefreshing = false
+                            }
                         }
                     },
                     onClose = { isSearchExpanded = false }
                 )
+            }
+        }
+
+        // --- 1.2 LIVE NETWORK STATUS / REFRESH BANNER ---
+        if (isRefreshing || networkErrorMsg != null) {
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(NothingCardBg)
+                        .border(1.dp, if (networkErrorMsg != null) NothingRed else NothingCardBorder, RoundedCornerShape(14.dp))
+                        .padding(horizontal = 14.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        if (isRefreshing) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(12.dp),
+                                color = NothingWhite,
+                                strokeWidth = 1.5.dp
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = "CONNECTING TO LIVE METEO SENSORS...",
+                                color = NothingWhite70,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp
+                            )
+                        } else if (networkErrorMsg != null) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(NothingRed)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = networkErrorMsg ?: "",
+                                color = NothingRed,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp
+                            )
+                        }
+                    }
+                }
             }
         }
 
@@ -294,7 +388,7 @@ fun MainScreen(
                                             .padding(horizontal = 6.dp, vertical = 2.dp)
                                     ) {
                                         Text(
-                                            text = "CUSTOM",
+                                            text = "LIVE",
                                             color = NothingRed,
                                             fontFamily = FontFamily.Monospace,
                                             fontSize = 9.sp,
