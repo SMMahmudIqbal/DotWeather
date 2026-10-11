@@ -204,22 +204,17 @@ fun NDotText(
             val rows = 7
             val cols = 5
 
-            // Compute ideal character width and scale down proportionally if necessary
-            val idealCharWidth = size.height * (5f / 7f)
-            val spacingFactor = 0.22f
-            val maxAvailableWidth = size.width * 0.94f // Leave 3% safety margin on each side
-
-            val charWidth = if ((totalChars * idealCharWidth + (totalChars - 1) * idealCharWidth * spacingFactor) > maxAvailableWidth) {
-                maxAvailableWidth / (totalChars + (totalChars - 1) * spacingFactor)
-            } else {
-                idealCharWidth
-            }
+            val maxAvailableWidth = size.width * 0.90f
+            val spacingFactor = 0.20f
+            val charWidthFromHeight = size.height * (5f / 7f)
+            val charWidthFromWidth = maxAvailableWidth / (totalChars + (totalChars - 1) * spacingFactor)
+            val charWidth = charWidthFromHeight.coerceAtMost(charWidthFromWidth)
 
             val spacing = charWidth * spacingFactor
             val totalContentWidth = totalChars * charWidth + (totalChars - 1) * spacing
             val startX = (size.width - totalContentWidth) / 2f
 
-            val dotRadius = (charWidth / (cols * 2.4f)).coerceAtMost(size.height / (rows * 2.6f))
+            val dotRadius = (charWidth / (cols * 2.3f)).coerceAtMost(size.height / (rows * 2.5f))
             val stepY = size.height / rows
             val stepX = charWidth / cols
 
@@ -244,7 +239,7 @@ fun NDotText(
 
                         drawCircle(
                             color = color,
-                            radius = if (isActive) dotRadius else dotRadius * 0.42f,
+                            radius = if (isActive) dotRadius else dotRadius * 0.40f,
                             center = Offset(cx, cy)
                         )
                     }

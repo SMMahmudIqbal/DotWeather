@@ -12,6 +12,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -78,13 +79,12 @@ fun MainScreen(
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
-            .background(NothingBlack)
-            .padding(horizontal = 18.dp),
+            .background(NothingBlack),
+        contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // --- 1. NOTHING OS HEADER & CITY SELECTOR ---
         item {
-            Spacer(modifier = Modifier.height(14.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -358,8 +358,8 @@ fun MainScreen(
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 16.sp
                                     )
+                                    Spacer(modifier = Modifier.height(4.dp))
                                     if (hour.precipChance > 0) {
-                                        Spacer(modifier = Modifier.height(4.dp))
                                         Text(
                                             text = "${hour.precipChance}%",
                                             color = NothingRed,
@@ -367,7 +367,12 @@ fun MainScreen(
                                             fontSize = 10.sp
                                         )
                                     } else {
-                                        Spacer(modifier = Modifier.height(18.dp))
+                                        Text(
+                                            text = "--",
+                                            color = NothingWhite20,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 10.sp
+                                        )
                                     }
                                 }
                             }
