@@ -1,9 +1,12 @@
 package com.example.dotweather.ui.main
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -54,6 +57,7 @@ import com.example.dotweather.theme.NothingWhite20
 import com.example.dotweather.theme.NothingWhite40
 import com.example.dotweather.theme.NothingWhite70
 import com.example.dotweather.ui.components.DotMatrixIcon
+import com.example.dotweather.ui.components.LocationSearchCard
 import com.example.dotweather.ui.components.NDotText
 import com.example.dotweather.ui.components.NothingCard
 
@@ -64,11 +68,14 @@ fun MainScreen(
     onItemClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    var citiesList by remember { mutableStateOf(WeatherRepository.predefinedCities) }
     var selectedCityIndex by remember { mutableIntStateOf(0) }
     var isCelsius by remember { mutableStateOf(true) }
     var selectedTab by remember { mutableIntStateOf(0) } // 0: HOURLY, 1: AIR QUALITY, 2: 7-DAY
+    var isSearchExpanded by remember { mutableStateOf(false) }
+    var searchQuery by remember { mutableStateOf("") }
 
-    val currentCity = WeatherRepository.sampleCities[selectedCityIndex]
+    val currentCity = citiesList.getOrElse(selectedCityIndex) { citiesList[0] }
 
     val displayTemp = if (isCelsius) currentCity.currentTemp else (currentCity.currentTemp * 9 / 5 + 32)
     val displayHigh = if (isCelsius) currentCity.highTemp else (currentCity.highTemp * 9 / 5 + 32)
@@ -119,45 +126,95 @@ fun MainScreen(
                     )
                 }
 
-                // C / F Pill Toggle
                 Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .border(1.dp, NothingCardBorder, RoundedCornerShape(20.dp))
-                        .background(NothingCardBg)
-                        .padding(horizontal = 4.dp, vertical = 4.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    // Location Search Trigger Button
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (isCelsius) NothingWhite else Color.Transparent)
-                            .clickable { isCelsius = true }
-                            .padding(horizontal = 11.dp, vertical = 5.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .border(1.dp, if (isSearchExpanded) NothingWhite else NothingCardBorder, RoundedCornerShape(20.dp))
+                            .background(if (isSearchExpanded) NothingWhite else NothingCardBg)
+                            .clickable { isSearchExpanded = !isSearchExpanded }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
                         Text(
-                            text = "°C",
-                            color = if (isCelsius) NothingBlack else NothingWhite40,
+                            text = if (isSearchExpanded) "CLOSE" else "+ LOCATION",
+                            color = if (isSearchExpanded) NothingBlack else NothingWhite,
                             fontFamily = FontFamily.Monospace,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
+                            fontSize = 11.sp,
+                            letterSpacing = 0.5.sp
                         )
                     }
-                    Box(
+
+                    // C / F Pill Toggle
+                    Row(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(if (!isCelsius) NothingWhite else Color.Transparent)
-                            .clickable { isCelsius = false }
-                            .padding(horizontal = 11.dp, vertical = 5.dp)
+                            .clip(RoundedCornerShape(20.dp))
+                            .border(1.dp, NothingCardBorder, RoundedCornerShape(20.dp))
+                            .background(NothingCardBg)
+                            .padding(horizontal = 4.dp, vertical = 4.dp)
                     ) {
-                        Text(
-                            text = "°F",
-                            color = if (!isCelsius) NothingBlack else NothingWhite40,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 11.sp
-                        )
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(if (isCelsius) NothingWhite else Color.Transparent)
+                                .clickable { isCelsius = true }
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "°C",
+                                color = if (isCelsius) NothingBlack else NothingWhite40,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(if (!isCelsius) NothingWhite else Color.Transparent)
+                                .clickable { isCelsius = false }
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "°F",
+                                color = if (!isCelsius) NothingBlack else NothingWhite40,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+                        }
                     }
                 }
+            }
+        }
+
+        // --- 1.1 ANIMATED SEARCH DRAWER ---
+        item {
+            AnimatedVisibility(
+                visible = isSearchExpanded,
+                enter = expandVertically(tween(220)) + fadeIn(tween(220)),
+                exit = shrinkVertically(tween(220)) + fadeOut(tween(220))
+            ) {
+                LocationSearchCard(
+                    searchQuery = searchQuery,
+                    onQueryChange = { searchQuery = it },
+                    onSearchSubmit = { query ->
+                        val trimmed = query.trim()
+                        if (trimmed.isNotEmpty()) {
+                            val newCity = WeatherRepository.createWeatherForLocation(trimmed)
+                            // Prepend new city to list so user immediately sees it
+                            citiesList = listOf(newCity) + citiesList
+                            selectedCityIndex = 0
+                            searchQuery = ""
+                            isSearchExpanded = false
+                        }
+                    },
+                    onClose = { isSearchExpanded = false }
+                )
             }
         }
 
@@ -169,7 +226,7 @@ fun MainScreen(
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                WeatherRepository.sampleCities.forEachIndexed { index, city ->
+                citiesList.forEachIndexed { index, city ->
                     val isSelected = index == selectedCityIndex
                     Box(
                         modifier = Modifier
@@ -179,14 +236,25 @@ fun MainScreen(
                             .clickable { selectedCityIndex = index }
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                     ) {
-                        Text(
-                            text = "${city.cityName}, ${city.country}",
-                            color = if (isSelected) NothingBlack else NothingWhite70,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.SemiBold,
-                            fontSize = 12.sp,
-                            letterSpacing = 0.8.sp
-                        )
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (city.isCustomLocation) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(5.dp)
+                                        .clip(CircleShape)
+                                        .background(if (isSelected) NothingRed else NothingWhite40)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                            }
+                            Text(
+                                text = "${city.cityName}, ${city.country}",
+                                color = if (isSelected) NothingBlack else NothingWhite70,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 12.sp,
+                                letterSpacing = 0.8.sp
+                            )
+                        }
                     }
                 }
             }
@@ -207,14 +275,34 @@ fun MainScreen(
                         verticalAlignment = Alignment.Top
                     ) {
                         Column {
-                            Text(
-                                text = currentCity.cityName,
-                                color = NothingWhite,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 24.sp,
-                                letterSpacing = 1.5.sp
-                            )
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = currentCity.cityName,
+                                    color = NothingWhite,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 24.sp,
+                                    letterSpacing = 1.5.sp
+                                )
+                                if (currentCity.isCustomLocation) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(10.dp))
+                                            .background(NothingCardInner)
+                                            .border(1.dp, NothingCardBorder, RoundedCornerShape(10.dp))
+                                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                                    ) {
+                                        Text(
+                                            text = "CUSTOM",
+                                            color = NothingRed,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+                            }
                             Spacer(modifier = Modifier.height(3.dp))
                             Text(
                                 text = currentCity.conditionDesc,
