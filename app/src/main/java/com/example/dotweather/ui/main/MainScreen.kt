@@ -268,32 +268,22 @@ fun MainScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        // Iconic Nothing Red Recording Dot
-                        Box(
-                            modifier = Modifier
-                                .size(7.dp)
-                                .clip(CircleShape)
-                                .background(NothingRed)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "DOTWEATHER // LIVE",
-                            color = NothingWhite70,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 13.sp,
-                            letterSpacing = 1.2.sp
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(2.dp))
+                // Header Title with iconic Nothing Red Dot
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(7.dp)
+                            .clip(CircleShape)
+                            .background(NothingRed)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Developed by S. M. Mahmud Iqbal",
-                        color = NothingWhite40,
+                        text = "DOTWEATHER",
+                        color = NothingWhite,
                         fontFamily = FontFamily.Monospace,
-                        fontSize = 10.sp,
-                        letterSpacing = 0.5.sp
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        letterSpacing = 1.2.sp
                     )
                 }
 
@@ -311,7 +301,7 @@ fun MainScreen(
                                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                 isSearchExpanded = !isSearchExpanded
                             }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .padding(horizontal = 12.dp, vertical = 7.dp)
                     ) {
                         Text(
                             text = if (isSearchExpanded) "CLOSE" else "+ LOCATION",
@@ -323,26 +313,62 @@ fun MainScreen(
                         )
                     }
 
-                    // Temperature Unit Toggle (°C / °F)
-                    Box(
+                    // Symmetrical, Perfectly Even Nothing OS Dual Unit Switch (°C / °F)
+                    Row(
                         modifier = Modifier
                             .clip(RoundedCornerShape(20.dp))
                             .border(1.dp, NothingCardBorder, RoundedCornerShape(20.dp))
                             .background(NothingCardBg)
-                            .clickable {
-                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                isCelsius = !isCelsius
-                                cityStorage.setUnitIsCelsius(isCelsius)
-                            }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
+                            .padding(2.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = if (isCelsius) "°C" else "°F",
-                            color = NothingWhite,
-                            fontFamily = FontFamily.Monospace,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp
-                        )
+                        // °C button
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(if (isCelsius) NothingWhite else Color.Transparent)
+                                .clickable {
+                                    if (!isCelsius) {
+                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        isCelsius = true
+                                        cityStorage.setUnitIsCelsius(true)
+                                    }
+                                }
+                                .padding(horizontal = 9.dp, vertical = 5.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "°C",
+                                color = if (isCelsius) NothingBlack else NothingWhite40,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+                        }
+
+                        // °F button
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(if (!isCelsius) NothingWhite else Color.Transparent)
+                                .clickable {
+                                    if (isCelsius) {
+                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        isCelsius = false
+                                        cityStorage.setUnitIsCelsius(false)
+                                    }
+                                }
+                                .padding(horizontal = 9.dp, vertical = 5.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "°F",
+                                color = if (!isCelsius) NothingBlack else NothingWhite40,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 11.sp
+                            )
+                        }
                     }
                 }
             }
