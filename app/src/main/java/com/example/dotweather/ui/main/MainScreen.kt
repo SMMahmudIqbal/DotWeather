@@ -1,5 +1,6 @@
 package com.example.dotweather.ui.main
 
+import android.content.Intent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -43,11 +44,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.dotweather.data.CityStorage
 import com.example.dotweather.data.CityWeather
+import com.example.dotweather.data.SavedLocation
 import com.example.dotweather.data.WeatherApiClient
 import com.example.dotweather.data.WeatherRepository
 import com.example.dotweather.theme.NothingBlack
@@ -64,27 +70,52 @@ import com.example.dotweather.ui.components.DotMatrixIcon
 import com.example.dotweather.ui.components.LocationSearchCard
 import com.example.dotweather.ui.components.NDotText
 import com.example.dotweather.ui.components.NothingCard
+import com.example.dotweather.ui.components.WeatherCondition
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 
-// Developed by S. M. Mahmud Iqbal
+// Author Attribution: Developed by S. M. Mahmud Iqbal
 
 @Composable
 fun MainScreen(
     onItemClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
+    val haptics = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
+    val cityStorage = remember { CityStorage(context) }
+
     var citiesList by remember { mutableStateOf(WeatherRepository.defaultFallbackCities) }
-    var selectedCityIndex by remember { mutableIntStateOf(0) }
-    var isCelsius by remember { mutableStateOf(true) }
+    var selectedCityIndex by remember { mutableIntStateOf(cityStorage.getLastCityIndex()) }
+    var isCelsius by remember { mutableStateOf(cityStorage.getUnitIsCelsius()) }
     var selectedTab by remember { mutableIntStateOf(0) } // 0: HOURLY, 1: AIR QUALITY, 2: 7-DAY
     var isSearchExpanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
+    var searchResults by remember { mutableStateOf<List<WeatherApiClient.GeoResult>>(emptyList()) }
     var isRefreshing by remember { mutableStateOf(false) }
+    var isLocating by remember { mutableStateOf(false) }
     var networkErrorMsg by remember { mutableStateOf<String?>(null) }
 
-    // Initial Live Load: Fetch real-time data for initial world cities asynchronously
+    // Synchronize saved cities to persistent local storage
+    fun persistCities(list: List<CityWeather>) {
+        val toSave = list.filter { it.isCustomLocation || it.isGpsLocation }.map {
+            SavedLocation(
+                name = it.cityName,
+                country = it.country,
+                lat = it.latitude,
+                lon = it.longitude,
+                isCustom = it.isCustomLocation,
+                isGps = it.isGpsLocation
+            )
+        }
+        cityStorage.saveLocations(toSave)
+    }
+
+    // Refresh telemetry for current active city
     fun refreshCurrentCity(city: CityWeather) {
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
         coroutineScope.launch {
             isRefreshing = true
             networkErrorMsg = null
@@ -93,12 +124,14 @@ fun MainScreen(
                 country = city.country,
                 latitude = city.latitude,
                 longitude = city.longitude,
-                isCustom = city.isCustomLocation
+                isCustom = city.isCustomLocation,
+                isGps = city.isGpsLocation
             )
             if (updated != null) {
                 citiesList = citiesList.mapIndexed { idx, item ->
                     if (idx == selectedCityIndex) updated else item
                 }
+                persistCities(citiesList)
             } else {
                 networkErrorMsg = "FAILED TO REFRESH TELEMETRY"
             }
@@ -106,20 +139,95 @@ fun MainScreen(
         }
     }
 
+    // Auto-detect current device location
+    fun triggerAutoLocation() {
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        coroutineScope.launch {
+            isLocating = true
+            networkErrorMsg = null
+            val detected = WeatherApiClient.detectCurrentLocation()
+            if (detected != null) {
+                val liveWeather = WeatherApiClient.fetchLiveWeather(
+                    name = detected.name,
+                    country = detected.country,
+                    latitude = detected.latitude,
+                    longitude = detected.longitude,
+                    isCustom = true,
+                    isGps = true
+                )
+                if (liveWeather != null) {
+                    val filtered = citiesList.filterNot { it.cityName == liveWeather.cityName && it.country == liveWeather.country }
+                    citiesList = listOf(liveWeather) + filtered
+                    selectedCityIndex = 0
+                    cityStorage.setLastCityIndex(0)
+                    persistCities(citiesList)
+                    isSearchExpanded = false
+                    searchQuery = ""
+                    searchResults = emptyList()
+                } else {
+                    networkErrorMsg = "LOCATION LOCATED, BUT TELEMETRY FAILED"
+                }
+            } else {
+                networkErrorMsg = "AUTO-LOCATION TIMEOUT. CHECK CONNECTION."
+            }
+            isLocating = false
+        }
+    }
+
+    // High speed parallel initial loading of default and saved cities
     LaunchedEffect(Unit) {
         isRefreshing = true
-        val fetchedList = mutableListOf<CityWeather>()
-        for (target in WeatherRepository.initialTargets) {
-            val liveData = WeatherApiClient.fetchLiveWeather(
-                name = target.name,
-                country = target.country,
-                latitude = target.lat,
-                longitude = target.lon,
-                isCustom = false
-            )
-            if (liveData != null) {
-                fetchedList.add(liveData)
-                citiesList = fetchedList.toList()
+        val saved = cityStorage.getSavedLocations()
+
+        // 1. If no custom locations exist, auto detect user's current city on cold launch
+        if (saved.none { it.isGps }) {
+            launch {
+                val autoLoc = WeatherApiClient.detectCurrentLocation()
+                if (autoLoc != null) {
+                    val autoWeather = WeatherApiClient.fetchLiveWeather(
+                        name = autoLoc.name,
+                        country = autoLoc.country,
+                        latitude = autoLoc.latitude,
+                        longitude = autoLoc.longitude,
+                        isCustom = true,
+                        isGps = true
+                    )
+                    if (autoWeather != null) {
+                        citiesList = listOf(autoWeather) + citiesList.filterNot { it.cityName == autoWeather.cityName }
+                        selectedCityIndex = 0
+                        persistCities(citiesList)
+                    }
+                }
+            }
+        }
+
+        // Build list of targets to fetch
+        val targets = mutableListOf<SavedLocation>()
+        targets.addAll(saved)
+        for (initial in WeatherRepository.initialTargets) {
+            if (targets.none { it.name.equals(initial.name, ignoreCase = true) }) {
+                targets.add(SavedLocation(initial.name, initial.country, initial.lat, initial.lon, isCustom = false, isGps = false))
+            }
+        }
+
+        // Fetch in parallel using coroutine async
+        val deferredList = targets.map { target ->
+            async {
+                WeatherApiClient.fetchLiveWeather(
+                    name = target.name,
+                    country = target.country,
+                    latitude = target.lat,
+                    longitude = target.lon,
+                    isCustom = target.isCustom,
+                    isGps = target.isGps
+                )
+            }
+        }
+        val results = deferredList.awaitAll().filterNotNull()
+        if (results.isNotEmpty()) {
+            citiesList = results
+            if (selectedCityIndex >= citiesList.size) {
+                selectedCityIndex = 0
             }
         }
         isRefreshing = false
@@ -133,6 +241,19 @@ fun MainScreen(
     val displayFeelsLike = if (isCelsius) currentCity.feelsLike else (currentCity.feelsLike * 9 / 5 + 32)
     val unitSymbol = if (isCelsius) "°C" else "°F"
 
+    val advisoryText = remember(currentCity) {
+        when {
+            currentCity.condition == WeatherCondition.THUNDERSTORM -> "⚡ SEVERE THUNDERSTORM WARNING // LIGHTNING RISK"
+            currentCity.condition == WeatherCondition.RAINY || currentCity.hourly.any { it.precipChance >= 60 } -> "🌧 PRECIPITATION ADVISORY // RAIN SHOWERS EXPECTED"
+            currentCity.windSpeed >= 32 -> "💨 HIGH WIND WARNING (${currentCity.windSpeed} KM/H // GUSTY)"
+            currentCity.uvIndex >= 6 -> "☀ HIGH UV INDEX (${currentCity.uvIndex}) // SUN PROTECTION ADVISED"
+            currentCity.airQuality.aqi > 65 -> "☣ AIR QUALITY CAUTION (AQI ${currentCity.airQuality.aqi}) // ELEVATED PARTICULATES"
+            currentCity.currentTemp <= 0 -> "❄ FREEZING ATMOSPHERE // FROST HAZARD"
+            else -> "✓ OPTIMAL ATMOSPHERIC TELEMETRY // STABLE"
+        }
+    }
+    val isAdvisoryWarning = advisoryText.startsWith("⚡") || advisoryText.startsWith("🌧") || advisoryText.startsWith("💨") || advisoryText.startsWith("☀") || advisoryText.startsWith("☣") || advisoryText.startsWith("❄")
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
@@ -140,7 +261,7 @@ fun MainScreen(
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // --- 1. NOTHING OS HEADER & CITY SELECTOR ---
+        // --- 1. NOTHING OS HEADER & CITY CONTROLS ---
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -186,7 +307,10 @@ fun MainScreen(
                             .clip(RoundedCornerShape(20.dp))
                             .border(1.dp, if (isSearchExpanded) NothingWhite else NothingCardBorder, RoundedCornerShape(20.dp))
                             .background(if (isSearchExpanded) NothingWhite else NothingCardBg)
-                            .clickable { isSearchExpanded = !isSearchExpanded }
+                            .clickable {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                isSearchExpanded = !isSearchExpanded
+                            }
                             .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
                         Text(
@@ -199,44 +323,26 @@ fun MainScreen(
                         )
                     }
 
-                    // C / F Pill Toggle
-                    Row(
+                    // Temperature Unit Toggle (°C / °F)
+                    Box(
                         modifier = Modifier
                             .clip(RoundedCornerShape(20.dp))
                             .border(1.dp, NothingCardBorder, RoundedCornerShape(20.dp))
                             .background(NothingCardBg)
-                            .padding(horizontal = 4.dp, vertical = 4.dp)
+                            .clickable {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                isCelsius = !isCelsius
+                                cityStorage.setUnitIsCelsius(isCelsius)
+                            }
+                            .padding(horizontal = 12.dp, vertical = 6.dp)
                     ) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(if (isCelsius) NothingWhite else Color.Transparent)
-                                .clickable { isCelsius = true }
-                                .padding(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = "°C",
-                                color = if (isCelsius) NothingBlack else NothingWhite40,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp
-                            )
-                        }
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(16.dp))
-                                .background(if (!isCelsius) NothingWhite else Color.Transparent)
-                                .clickable { isCelsius = false }
-                                .padding(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = "°F",
-                                color = if (!isCelsius) NothingBlack else NothingWhite40,
-                                fontFamily = FontFamily.Monospace,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 11.sp
-                            )
-                        }
+                        Text(
+                            text = if (isCelsius) "°C" else "°F",
+                            color = NothingWhite,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp
+                        )
                     }
                 }
             }
@@ -251,7 +357,17 @@ fun MainScreen(
             ) {
                 LocationSearchCard(
                     searchQuery = searchQuery,
-                    onQueryChange = { searchQuery = it },
+                    onQueryChange = { query ->
+                        searchQuery = query
+                        if (query.trim().length >= 2) {
+                            coroutineScope.launch {
+                                val results = WeatherApiClient.searchGeocodingMulti(query, count = 4)
+                                searchResults = results
+                            }
+                        } else {
+                            searchResults = emptyList()
+                        }
+                    },
                     onSearchSubmit = { query ->
                         val trimmed = query.trim()
                         if (trimmed.isNotEmpty()) {
@@ -268,9 +384,12 @@ fun MainScreen(
                                         isCustom = true
                                     )
                                     if (liveWeather != null) {
-                                        citiesList = listOf(liveWeather) + citiesList
+                                        citiesList = listOf(liveWeather) + citiesList.filterNot { it.cityName == liveWeather.cityName }
                                         selectedCityIndex = 0
+                                        cityStorage.setLastCityIndex(0)
+                                        persistCities(citiesList)
                                         searchQuery = ""
+                                        searchResults = emptyList()
                                         isSearchExpanded = false
                                     } else {
                                         networkErrorMsg = "FAILED TO FETCH WEATHER TELEMETRY"
@@ -280,6 +399,32 @@ fun MainScreen(
                                 }
                                 isRefreshing = false
                             }
+                        }
+                    },
+                    onAutoDetectLocation = { triggerAutoLocation() },
+                    isLocating = isLocating,
+                    searchResults = searchResults,
+                    onSelectResult = { selectedResult ->
+                        coroutineScope.launch {
+                            isRefreshing = true
+                            networkErrorMsg = null
+                            val liveWeather = WeatherApiClient.fetchLiveWeather(
+                                name = selectedResult.name,
+                                country = selectedResult.country,
+                                latitude = selectedResult.latitude,
+                                longitude = selectedResult.longitude,
+                                isCustom = true
+                            )
+                            if (liveWeather != null) {
+                                citiesList = listOf(liveWeather) + citiesList.filterNot { it.cityName == liveWeather.cityName }
+                                selectedCityIndex = 0
+                                cityStorage.setLastCityIndex(0)
+                                persistCities(citiesList)
+                                searchQuery = ""
+                                searchResults = emptyList()
+                                isSearchExpanded = false
+                            }
+                            isRefreshing = false
                         }
                     },
                     onClose = { isSearchExpanded = false }
@@ -349,11 +494,20 @@ fun MainScreen(
                             .clip(RoundedCornerShape(24.dp))
                             .background(if (isSelected) NothingWhite else NothingCardBg)
                             .border(1.dp, if (isSelected) NothingWhite else NothingCardBorder, RoundedCornerShape(24.dp))
-                            .clickable { selectedCityIndex = index }
+                            .clickable {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                selectedCityIndex = index
+                                cityStorage.setLastCityIndex(index)
+                            }
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (city.isCustomLocation) {
+                            if (city.isGpsLocation) {
+                                Text(
+                                    text = "📍 ",
+                                    fontSize = 11.sp
+                                )
+                            } else if (city.isCustomLocation) {
                                 Box(
                                     modifier = Modifier
                                         .size(5.dp)
@@ -370,7 +524,7 @@ fun MainScreen(
                                 fontSize = 12.sp,
                                 letterSpacing = 0.8.sp
                             )
-                            if (city.isCustomLocation && citiesList.size > 1) {
+                            if ((city.isCustomLocation || city.isGpsLocation) && citiesList.size > 1) {
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
                                     text = "×",
@@ -382,8 +536,10 @@ fun MainScreen(
                                         val mutable = citiesList.toMutableList()
                                         mutable.removeAt(index)
                                         citiesList = mutable
+                                        persistCities(citiesList)
                                         if (selectedCityIndex >= citiesList.size) {
                                             selectedCityIndex = (citiesList.size - 1).coerceAtLeast(0)
+                                            cityStorage.setLastCityIndex(selectedCityIndex)
                                         }
                                     }
                                 )
@@ -391,6 +547,71 @@ fun MainScreen(
                         }
                     }
                 }
+            }
+        }
+
+        // --- 2.1 CONTEXTUAL WEATHER ADVISORY / SMART ALERT BANNER ---
+        item {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(NothingCardBg)
+                    .border(1.dp, if (isAdvisoryWarning) NothingRed.copy(alpha = 0.6f) else NothingCardBorder, RoundedCornerShape(16.dp))
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(if (isAdvisoryWarning) NothingRed else NothingWhite70)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = advisoryText,
+                        color = if (isAdvisoryWarning) NothingWhite else NothingWhite70,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = if (isAdvisoryWarning) FontWeight.Bold else FontWeight.Normal,
+                        fontSize = 11.sp,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+
+                // Share Weather Telemetry Button
+                Text(
+                    text = "[SHARE]",
+                    color = NothingWhite40,
+                    fontFamily = FontFamily.Monospace,
+                    fontSize = 10.sp,
+                    modifier = Modifier.clickable {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        val sendIntent = Intent().apply {
+                            action = Intent.ACTION_SEND
+                            putExtra(
+                                Intent.EXTRA_TEXT,
+                                """
+                                |DOTWEATHER TELEMETRY // NOTHING OS 3.0
+                                |--------------------------------------
+                                |Location: ${currentCity.cityName}, ${currentCity.country}
+                                |Condition: ${currentCity.conditionDesc}
+                                |Current Temp: $displayTemp$unitSymbol (Feels: $displayFeelsLike$unitSymbol)
+                                |High: $displayHigh$unitSymbol | Low: $displayLow$unitSymbol
+                                |Wind: ${currentCity.windSpeed} km/h ${currentCity.windDirection}
+                                |Humidity: ${currentCity.humidity}% | Barometer: ${currentCity.pressureHpa} hPa
+                                |Air Quality: ${currentCity.airQuality.aqi} (${currentCity.airQuality.status})
+                                |Sunrise: ${currentCity.sunrise} | Sunset: ${currentCity.sunset}
+                                |
+                                |Developed by S. M. Mahmud Iqbal
+                                """.trimMargin()
+                            )
+                            type = "text/plain"
+                        }
+                        context.startActivity(Intent.createChooser(sendIntent, "Share Weather Telemetry"))
+                    }
+                )
             }
         }
 
@@ -503,7 +724,7 @@ fun MainScreen(
             }
         }
 
-        // --- 4. TAB SELECTOR (HOURLY / AIR / 7-DAY) ---
+        // --- 4. TAB SELECTOR (HOURLY / AIR QUALITY / 7-DAY) ---
         item {
             Row(
                 modifier = Modifier
@@ -520,7 +741,10 @@ fun MainScreen(
                             .weight(1f)
                             .clip(RoundedCornerShape(14.dp))
                             .background(if (isTabSelected) NothingCardInner else Color.Transparent)
-                            .clickable { selectedTab = idx }
+                            .clickable {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                selectedTab = idx
+                            }
                             .padding(vertical = 10.dp),
                         contentAlignment = Alignment.Center
                     ) {
@@ -604,7 +828,7 @@ fun MainScreen(
                     }
                 }
 
-                // ENVIRONMENTAL SENSORS (Expanded: Wind, Humidity, UV, Barometer, Sunrise, Sunset)
+                // ENVIRONMENTAL SENSORS (Expanded: Wind, Humidity, UV, Barometer, Visibility, Sunrise, Sunset)
                 item {
                     Text(
                         text = "ENVIRONMENTAL SENSORS",
@@ -630,7 +854,7 @@ fun MainScreen(
                                 Text("DIR: ${currentCity.windDirection}", color = NothingWhite70, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                             }
                         }
-                        // HUMIDITY CARD
+                        // HUMIDITY & DEW POINT CARD
                         NothingCard(
                             modifier = Modifier.weight(1f),
                             cornerRadius = 22.dp
@@ -663,7 +887,7 @@ fun MainScreen(
                                 Text(if (currentCity.uvIndex > 5) "HIGH EXPOSURE" else "LOW RISK", color = NothingWhite70, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                             }
                         }
-                        // PRESSURE CARD
+                        // BAROMETRIC PRESSURE CARD
                         NothingCard(
                             modifier = Modifier.weight(1f),
                             cornerRadius = 22.dp
@@ -672,38 +896,95 @@ fun MainScreen(
                                 Text("BAROMETER", color = NothingWhite40, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text("${currentCity.pressureHpa} hPa", color = NothingWhite, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                                Text("STEADY", color = NothingWhite70, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                                val presDesc = when {
+                                    currentCity.pressureHpa > 1020 -> "HIGH // DRY"
+                                    currentCity.pressureHpa < 1005 -> "LOW // STORMY"
+                                    else -> "NORMAL // STABLE"
+                                }
+                                Text(presDesc, color = NothingWhite70, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                             }
                         }
                     }
                 }
 
-                // SUNRISE & SUNSET METRIC CARDS
+                // VISIBILITY CARD
                 item {
-                    Row(
+                    NothingCard(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        cornerRadius = 22.dp
                     ) {
-                        NothingCard(
-                            modifier = Modifier.weight(1f),
-                            cornerRadius = 22.dp
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             Column {
-                                Text("SUNRISE", color = NothingWhite40, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(currentCity.sunrise, color = NothingWhite, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                                Text("DAWN ORBIT", color = NothingWhite70, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                                Text("VISIBILITY RANGE", color = NothingWhite40, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text("${currentCity.visibilityKm} KM", color = NothingWhite, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 18.sp)
                             }
+                            Text(
+                                text = if (currentCity.visibilityKm >= 10) "OPTIMAL CLARITY" else "HAZY / REDUCED",
+                                color = NothingWhite70,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 11.sp
+                            )
                         }
-                        NothingCard(
-                            modifier = Modifier.weight(1f),
-                            cornerRadius = 22.dp
-                        ) {
-                            Column {
-                                Text("SUNSET", color = NothingWhite40, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(currentCity.sunset, color = NothingWhite, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                                Text("DUSK ORBIT", color = NothingWhite70, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                    }
+                }
+
+                // ASTRONOMICAL SOLAR CYCLE & DAYLIGHT CARD
+                item {
+                    NothingCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        cornerRadius = 22.dp
+                    ) {
+                        Column {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text("SOLAR CYCLE", color = NothingWhite40, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                                if (currentCity.daylightDurationDesc.isNotEmpty()) {
+                                    Text(currentCity.daylightDurationDesc, color = NothingRed, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 10.sp)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column {
+                                    Text("SUNRISE", color = NothingWhite40, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(currentCity.sunrise, color = NothingWhite, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                                    Text("DAWN ORBIT", color = NothingWhite70, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                                }
+
+                                // Visual dot-line celestial separator
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 12.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    repeat(7) { dotIdx ->
+                                        Box(
+                                            modifier = Modifier
+                                                .size(if (dotIdx == 3) 6.dp else 3.dp)
+                                                .clip(CircleShape)
+                                                .background(if (dotIdx == 3) NothingRed else NothingWhite20)
+                                        )
+                                    }
+                                }
+
+                                Column(horizontalAlignment = Alignment.End) {
+                                    Text("SUNSET", color = NothingWhite40, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(currentCity.sunset, color = NothingWhite, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                                    Text("DUSK ORBIT", color = NothingWhite70, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                                }
                             }
                         }
                     }
@@ -729,7 +1010,7 @@ fun MainScreen(
                                 )
                                 Text(
                                     text = currentCity.airQuality.status,
-                                    color = if (currentCity.airQuality.aqi <= 50) NothingWhite else NothingRed,
+                                    color = if (currentCity.airQuality.aqi <= 35) NothingWhite else NothingRed,
                                     fontFamily = FontFamily.Monospace,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 12.sp
@@ -784,8 +1065,12 @@ fun MainScreen(
             }
 
             2 -> {
-                // 7-DAY FORECAST
+                // 7-DAY FORECAST WITH MIN-MAX COMPARISON BARS
                 item {
+                    val weekMin = currentCity.daily.minOfOrNull { it.minTemp } ?: 10
+                    val weekMax = currentCity.daily.maxOfOrNull { it.maxTemp } ?: 30
+                    val tempSpan = (weekMax - weekMin).coerceAtLeast(1)
+
                     NothingCard(modifier = Modifier.fillMaxWidth()) {
                         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                             Text(
@@ -798,6 +1083,10 @@ fun MainScreen(
                             currentCity.daily.forEach { forecast ->
                                 val maxTemp = if (isCelsius) forecast.maxTemp else (forecast.maxTemp * 9 / 5 + 32)
                                 val minTemp = if (isCelsius) forecast.minTemp else (forecast.minTemp * 9 / 5 + 32)
+
+                                val leftRatio = ((forecast.minTemp - weekMin).toFloat() / tempSpan).coerceIn(0f, 1f)
+                                val barRatio = ((forecast.maxTemp - forecast.minTemp).toFloat() / tempSpan).coerceIn(0.1f, 1f)
+
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -805,30 +1094,62 @@ fun MainScreen(
                                 ) {
                                     Text(
                                         text = forecast.day,
-                                        color = NothingWhite,
+                                        color = if (forecast.day == "TODAY") NothingWhite else NothingWhite70,
                                         fontFamily = FontFamily.Monospace,
-                                        fontWeight = FontWeight.SemiBold,
-                                        fontSize = 13.sp,
-                                        modifier = Modifier.width(80.dp)
+                                        fontWeight = if (forecast.day == "TODAY") FontWeight.Bold else FontWeight.SemiBold,
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.width(68.dp)
                                     )
-                                    DotMatrixIcon(condition = forecast.condition, size = 28.dp)
+
+                                    DotMatrixIcon(condition = forecast.condition, size = 26.dp)
+
+                                    // Visual horizontal temperature bar
                                     Row(
-                                        modifier = Modifier.width(100.dp),
-                                        horizontalArrangement = Arrangement.End
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .padding(horizontal = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
                                     ) {
+                                        Text(
+                                            text = "$minTemp°",
+                                            color = NothingWhite40,
+                                            fontFamily = FontFamily.Monospace,
+                                            fontSize = 11.sp,
+                                            modifier = Modifier.width(28.dp)
+                                        )
+
+                                        Box(
+                                            modifier = Modifier
+                                                .weight(1f)
+                                                .height(4.dp)
+                                                .clip(RoundedCornerShape(2.dp))
+                                                .background(NothingWhite10)
+                                        ) {
+                                            Row(modifier = Modifier.fillMaxWidth()) {
+                                                if (leftRatio > 0.05f) {
+                                                    Spacer(modifier = Modifier.weight(leftRatio))
+                                                }
+                                                Box(
+                                                    modifier = Modifier
+                                                        .weight(barRatio)
+                                                        .height(4.dp)
+                                                        .clip(RoundedCornerShape(2.dp))
+                                                        .background(if (forecast.day == "TODAY") NothingRed else NothingWhite70)
+                                                )
+                                                val rightRatio = (1f - leftRatio - barRatio).coerceAtLeast(0f)
+                                                if (rightRatio > 0.05f) {
+                                                    Spacer(modifier = Modifier.weight(rightRatio))
+                                                }
+                                            }
+                                        }
+
                                         Text(
                                             text = "$maxTemp°",
                                             color = NothingWhite,
                                             fontFamily = FontFamily.Monospace,
                                             fontWeight = FontWeight.Bold,
-                                            fontSize = 13.sp
-                                        )
-                                        Spacer(modifier = Modifier.width(10.dp))
-                                        Text(
-                                            text = "$minTemp°",
-                                            color = NothingWhite40,
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 13.sp
+                                            fontSize = 11.sp,
+                                            modifier = Modifier.width(32.dp).padding(start = 4.dp)
                                         )
                                     }
                                 }

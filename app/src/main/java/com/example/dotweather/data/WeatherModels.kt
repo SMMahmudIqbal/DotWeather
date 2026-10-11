@@ -48,6 +48,8 @@ data class CityWeather(
     val hourly: List<HourlyForecast>,
     val daily: List<DailyForecast>,
     val isCustomLocation: Boolean = false,
+    val isGpsLocation: Boolean = false,
+    val daylightDurationDesc: String = "",
     val latitude: Double = 0.0,
     val longitude: Double = 0.0,
     val lastUpdated: String = "LIVE"

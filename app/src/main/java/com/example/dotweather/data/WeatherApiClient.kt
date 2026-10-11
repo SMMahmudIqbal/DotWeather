@@ -14,8 +14,8 @@ import java.util.Locale
 // Author Attribution: Developed by S. M. Mahmud Iqbal
 
 /**
- * Live Weather API Client using Open-Meteo & Open-Meteo Geocoding APIs.
- * 100% Free, no API key required, high precision global weather & air quality.
+ * Live Weather API Client using Open-Meteo & Open-Meteo Geocoding APIs + IP Geolocation.
+ * 100% Free, no API key required, high precision global weather & air quality telemetry.
  */
 object WeatherApiClient {
 
@@ -23,7 +23,8 @@ object WeatherApiClient {
         val name: String,
         val country: String,
         val latitude: Double,
-        val longitude: Double
+        val longitude: Double,
+        val adminRegion: String = ""
     )
 
     private fun mapWeatherCodeToCondition(wmoCode: Int): Pair<WeatherCondition, String> {
@@ -54,39 +55,90 @@ object WeatherApiClient {
         val url = URL(urlString)
         val conn = url.openConnection() as HttpURLConnection
         conn.requestMethod = "GET"
-        conn.connectTimeout = 8000
-        conn.readTimeout = 8000
-        conn.setRequestProperty("User-Agent", "DotWeather-Android-NothingOS/1.3")
+        conn.connectTimeout = 7000
+        conn.readTimeout = 7000
+        conn.setRequestProperty("User-Agent", "DotWeather-Android-NothingOS/1.4")
         conn.inputStream.bufferedReader().use { reader ->
             return reader.readText()
         }
     }
 
     /**
-     * Resolves location name to latitude & longitude using Open-Meteo Geocoding
+     * Resolves single location name to latitude & longitude using Open-Meteo Geocoding
      */
     suspend fun searchGeocoding(cityName: String): GeoResult? = withContext(Dispatchers.IO) {
+        val results = searchGeocodingMulti(cityName, count = 1)
+        results.firstOrNull()
+    }
+
+    /**
+     * Searches Open-Meteo Geocoding for multiple matching locations worldwide
+     */
+    suspend fun searchGeocodingMulti(cityName: String, count: Int = 5): List<GeoResult> = withContext(Dispatchers.IO) {
+        val list = mutableListOf<GeoResult>()
         try {
             val encoded = URLEncoder.encode(cityName.trim(), "UTF-8")
-            val url = "https://geocoding-api.open-meteo.com/v1/search?name=$encoded&count=1&language=en&format=json"
+            val url = "https://geocoding-api.open-meteo.com/v1/search?name=$encoded&count=$count&language=en&format=json"
             val response = httpGet(url)
             val json = JSONObject(response)
             if (json.has("results")) {
                 val array = json.getJSONArray("results")
-                if (array.length() > 0) {
-                    val first = array.getJSONObject(0)
-                    val name = first.optString("name", cityName.uppercase())
-                    val country = first.optString("country_code", first.optString("country", "GLOBAL")).uppercase()
-                    val lat = first.getDouble("latitude")
-                    val lon = first.getDouble("longitude")
-                    return@withContext GeoResult(name, country, lat, lon)
+                for (i in 0 until array.length()) {
+                    val item = array.getJSONObject(i)
+                    val name = item.optString("name", "").uppercase()
+                    val country = item.optString("country_code", item.optString("country", "GLOBAL")).uppercase()
+                    val admin = item.optString("admin1", "").uppercase()
+                    val lat = item.getDouble("latitude")
+                    val lon = item.getDouble("longitude")
+                    if (name.isNotEmpty()) {
+                        list.add(GeoResult(name, country, lat, lon, admin))
+                    }
                 }
             }
-            null
         } catch (e: Exception) {
             e.printStackTrace()
-            null
         }
+        list
+    }
+
+    /**
+     * Instantly auto-detects current device location via high-speed IP Geolocation
+     */
+    suspend fun detectCurrentLocation(): GeoResult? = withContext(Dispatchers.IO) {
+        try {
+            val resp = httpGet("https://ipwho.is/")
+            val json = JSONObject(resp)
+            if (json.optBoolean("success", true)) {
+                val city = json.optString("city", "").trim()
+                val country = json.optString("country_code", json.optString("country", "")).trim()
+                val lat = json.optDouble("latitude", Double.NaN)
+                val lon = json.optDouble("longitude", Double.NaN)
+                val region = json.optString("region", "")
+                if (city.isNotEmpty() && !lat.isNaN() && !lon.isNaN()) {
+                    return@withContext GeoResult(city.uppercase(), country.uppercase(), lat, lon, region.uppercase())
+                }
+            }
+        } catch (e: Exception) {
+            // fallback
+        }
+
+        try {
+            val resp = httpGet("http://ip-api.com/json/")
+            val json = JSONObject(resp)
+            if (json.optString("status") == "success") {
+                val city = json.optString("city", "").trim()
+                val country = json.optString("countryCode", "").trim()
+                val lat = json.optDouble("lat", Double.NaN)
+                val lon = json.optDouble("lon", Double.NaN)
+                val region = json.optString("regionName", "")
+                if (city.isNotEmpty() && !lat.isNaN() && !lon.isNaN()) {
+                    return@withContext GeoResult(city.uppercase(), country.uppercase(), lat, lon, region.uppercase())
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        null
     }
 
     /**
@@ -97,11 +149,12 @@ object WeatherApiClient {
         country: String,
         latitude: Double,
         longitude: Double,
-        isCustom: Boolean = false
+        isCustom: Boolean = false,
+        isGps: Boolean = false
     ): CityWeather? = withContext(Dispatchers.IO) {
         try {
-            // 1. Fetch Forecast with Sunrise & Sunset
-            val weatherUrl = "https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,surface_pressure,wind_speed_10m,wind_direction_10m&hourly=temperature_2m,precipitation_probability,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,uv_index_max,sunrise,sunset&timezone=auto"
+            // 1. Fetch Forecast with Sunrise, Sunset, Visibility & Daylight duration
+            val weatherUrl = "https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,surface_pressure,wind_speed_10m,wind_direction_10m,visibility&hourly=temperature_2m,precipitation_probability,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,uv_index_max,sunrise,sunset,daylight_duration&timezone=auto"
             val weatherResponse = httpGet(weatherUrl)
             val weatherJson = JSONObject(weatherResponse)
 
@@ -115,6 +168,8 @@ object WeatherApiClient {
             val windSpeed = current.getDouble("wind_speed_10m").toInt()
             val windDirDeg = current.getDouble("wind_direction_10m")
             val windDirection = degreesToDirection(windDirDeg)
+            val rawVisibility = current.optDouble("visibility", 10000.0)
+            val visibilityKm = (rawVisibility / 1000.0).toInt().coerceAtLeast(1)
 
             val (condition, conditionDesc) = mapWeatherCodeToCondition(wmoCode)
 
@@ -127,6 +182,7 @@ object WeatherApiClient {
             val dailyUv = daily.optJSONArray("uv_index_max")
             val dailySunrise = daily.optJSONArray("sunrise")
             val dailySunset = daily.optJSONArray("sunset")
+            val dailyDaylight = daily.optJSONArray("daylight_duration")
 
             val todayHigh = if (dailyMaxs.length() > 0) dailyMaxs.getDouble(0).toInt() else currentTemp + 3
             val todayLow = if (dailyMins.length() > 0) dailyMins.getDouble(0).toInt() else currentTemp - 4
@@ -148,6 +204,14 @@ object WeatherApiClient {
                     val parsed = isoParser.parse(dailySunset.getString(0))
                     if (parsed != null) sunsetStr = timeExtractFormat.format(parsed)
                 } catch (e: Exception) { /* fallback */ }
+            }
+
+            var daylightDesc = ""
+            if (dailyDaylight != null && dailyDaylight.length() > 0) {
+                val sec = dailyDaylight.optDouble(0, 0.0).toInt()
+                val hrs = sec / 3600
+                val mins = (sec % 3600) / 60
+                daylightDesc = "${hrs}H ${mins}M DAYLIGHT"
             }
 
             val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
@@ -172,7 +236,7 @@ object WeatherApiClient {
                 dailyForecasts.add(DailyForecast(dayName, dMin, dMax, dCond))
             }
 
-            // Hourly Forecast (Next 12 hours)
+            // Hourly Forecast (Next 14 hours)
             val hourly = weatherJson.getJSONObject("hourly")
             val hourlyTimes = hourly.getJSONArray("time")
             val hourlyTemps = hourly.getJSONArray("temperature_2m")
@@ -250,13 +314,15 @@ object WeatherApiClient {
                 windDirection = windDirection,
                 uvIndex = todayUv,
                 pressureHpa = pressure,
-                visibilityKm = 10,
+                visibilityKm = visibilityKm,
                 sunrise = sunriseStr,
                 sunset = sunsetStr,
+                daylightDurationDesc = daylightDesc,
                 airQuality = airQuality,
                 hourly = hourlyForecasts,
                 daily = dailyForecasts,
                 isCustomLocation = isCustom,
+                isGpsLocation = isGps,
                 latitude = latitude,
                 longitude = longitude,
                 lastUpdated = updateTimestamp
