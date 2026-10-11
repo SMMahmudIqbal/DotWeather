@@ -74,38 +74,45 @@ object WeatherRepository {
     )
 
     // Immediate offline-safe defaults that get dynamically updated by live API data
-    val defaultFallbackCities = listOf(
-        CityWeather(
-            cityName = "LONDON",
-            country = "UK",
-            currentTemp = 16,
-            feelsLike = 15,
-            condition = WeatherCondition.PARTLY_CLOUDY,
-            conditionDesc = "LIVE SYNCHRONIZING...",
-            highTemp = 19,
-            lowTemp = 12,
-            humidity = 70,
-            windSpeed = 15,
-            windDirection = "NW",
-            uvIndex = 3,
-            pressureHpa = 1015,
-            visibilityKm = 10,
-            sunrise = "06:45",
-            sunset = "18:20",
-            airQuality = AirQuality(25, "GOOD", 6.5f, 11.2f, 28.0f, 15.0f),
-            hourly = listOf(
-                HourlyForecast("NOW", 16, WeatherCondition.PARTLY_CLOUDY, 10),
-                HourlyForecast("+1H", 17, WeatherCondition.PARTLY_CLOUDY, 10),
-                HourlyForecast("+2H", 18, WeatherCondition.SUNNY, 5),
-                HourlyForecast("+3H", 18, WeatherCondition.SUNNY, 0)
-            ),
-            daily = listOf(
-                DailyForecast("TODAY", 12, 19, WeatherCondition.PARTLY_CLOUDY),
-                DailyForecast("TOMORROW", 11, 18, WeatherCondition.RAINY)
-            ),
-            latitude = 51.5074,
-            longitude = -0.1278,
-            lastUpdated = "JUST NOW"
+    fun getInitialFallback(activeCityName: String? = null, activeCountry: String? = null): List<CityWeather> {
+        val name = activeCityName ?: "DHAKA"
+        val country = if (!activeCountry.isNullOrBlank()) activeCountry else "BD"
+        return listOf(
+            CityWeather(
+                cityName = name.uppercase(),
+                country = country.uppercase(),
+                currentTemp = 32,
+                feelsLike = 35,
+                condition = WeatherCondition.SUNNY,
+                conditionDesc = "LIVE SYNCHRONIZING...",
+                highTemp = 34,
+                lowTemp = 25,
+                humidity = 65,
+                windSpeed = 8,
+                windDirection = "N",
+                uvIndex = 6,
+                pressureHpa = 1012,
+                visibilityKm = 10,
+                sunrise = "05:50",
+                sunset = "17:35",
+                daylightDurationDesc = "11H 45M DAYLIGHT",
+                airQuality = AirQuality(40, "GOOD", 9.2f, 16.5f, 26.0f, 13.0f),
+                hourly = listOf(
+                    HourlyForecast("NOW", 32, WeatherCondition.SUNNY, 0),
+                    HourlyForecast("+1H", 32, WeatherCondition.SUNNY, 0),
+                    HourlyForecast("+2H", 31, WeatherCondition.PARTLY_CLOUDY, 5),
+                    HourlyForecast("+3H", 29, WeatherCondition.PARTLY_CLOUDY, 5)
+                ),
+                daily = listOf(
+                    DailyForecast("TODAY", 25, 34, WeatherCondition.SUNNY),
+                    DailyForecast("TOMORROW", 25, 33, WeatherCondition.PARTLY_CLOUDY)
+                ),
+                isCustomLocation = true,
+                isGpsLocation = true,
+                lastUpdated = "JUST NOW"
+            )
         )
-    )
+    }
+
+    val defaultFallbackCities = getInitialFallback()
 }

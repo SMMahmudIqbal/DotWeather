@@ -22,8 +22,19 @@ class CityStorage(context: Context) {
     fun getUnitIsCelsius(): Boolean = prefs.getBoolean("is_celsius", true)
     fun setUnitIsCelsius(isCelsius: Boolean) = prefs.edit().putBoolean("is_celsius", isCelsius).apply()
 
-    fun getLastCityIndex(): Int = prefs.getInt("last_city_index", 0)
-    fun setLastCityIndex(index: Int) = prefs.edit().putInt("last_city_index", index).apply()
+    fun getActiveCityName(): String? = prefs.getString("active_city_name", null)
+    fun getActiveCityCountry(): String = prefs.getString("active_city_country", "") ?: ""
+    fun getActiveCityLat(): Double = prefs.getString("active_city_lat", null)?.toDoubleOrNull() ?: Double.NaN
+    fun getActiveCityLon(): Double = prefs.getString("active_city_lon", null)?.toDoubleOrNull() ?: Double.NaN
+
+    fun setActiveCity(name: String, country: String, lat: Double, lon: Double) {
+        prefs.edit()
+            .putString("active_city_name", name.uppercase())
+            .putString("active_city_country", country.uppercase())
+            .putString("active_city_lat", lat.toString())
+            .putString("active_city_lon", lon.toString())
+            .apply()
+    }
 
     fun getSavedLocations(): List<SavedLocation> {
         val raw = prefs.getString("saved_locations", null) ?: return emptyList()
@@ -34,8 +45,8 @@ class CityStorage(context: Context) {
                 val obj = jsonArray.getJSONObject(i)
                 list.add(
                     SavedLocation(
-                        name = obj.getString("name"),
-                        country = obj.getString("country"),
+                        name = obj.getString("name").uppercase(),
+                        country = obj.getString("country").uppercase(),
                         lat = obj.getDouble("lat"),
                         lon = obj.getDouble("lon"),
                         isCustom = obj.optBoolean("isCustom", true),
@@ -53,8 +64,8 @@ class CityStorage(context: Context) {
         val jsonArray = JSONArray()
         for (loc in locations) {
             val obj = JSONObject().apply {
-                put("name", loc.name)
-                put("country", loc.country)
+                put("name", loc.name.uppercase())
+                put("country", loc.country.uppercase())
                 put("lat", loc.lat)
                 put("lon", loc.lon)
                 put("isCustom", loc.isCustom)

@@ -1,6 +1,5 @@
 package com.example.dotweather.ui.main
 
-import android.content.Intent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -70,7 +69,6 @@ import com.example.dotweather.ui.components.DotMatrixIcon
 import com.example.dotweather.ui.components.LocationSearchCard
 import com.example.dotweather.ui.components.NDotText
 import com.example.dotweather.ui.components.NothingCard
-import com.example.dotweather.ui.components.WeatherCondition
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
@@ -87,8 +85,16 @@ fun MainScreen(
     val coroutineScope = rememberCoroutineScope()
     val cityStorage = remember { CityStorage(context) }
 
-    var citiesList by remember { mutableStateOf(WeatherRepository.defaultFallbackCities) }
-    var selectedCityIndex by remember { mutableIntStateOf(cityStorage.getLastCityIndex()) }
+    // Read the user's previously chosen active city
+    val initialActiveName = remember { cityStorage.getActiveCityName() }
+    val initialActiveCountry = remember { cityStorage.getActiveCityCountry() }
+
+    var citiesList by remember {
+        mutableStateOf(
+            WeatherRepository.getInitialFallback(initialActiveName, initialActiveCountry)
+        )
+    }
+    var selectedCityIndex by remember { mutableIntStateOf(0) }
     var isCelsius by remember { mutableStateOf(cityStorage.getUnitIsCelsius()) }
     var selectedTab by remember { mutableIntStateOf(0) } // 0: HOURLY, 1: AIR QUALITY, 2: 7-DAY
     var isSearchExpanded by remember { mutableStateOf(false) }
@@ -98,9 +104,9 @@ fun MainScreen(
     var isLocating by remember { mutableStateOf(false) }
     var networkErrorMsg by remember { mutableStateOf<String?>(null) }
 
-    // Synchronize saved cities to persistent local storage
+    // Synchronize all saved cities to persistent local storage
     fun persistCities(list: List<CityWeather>) {
-        val toSave = list.filter { it.isCustomLocation || it.isGpsLocation }.map {
+        val toSave = list.map {
             SavedLocation(
                 name = it.cityName,
                 country = it.country,
@@ -111,6 +117,15 @@ fun MainScreen(
             )
         }
         cityStorage.saveLocations(toSave)
+    }
+
+    // Set selected city and permanently store it as the user's default active location
+    fun selectCity(index: Int) {
+        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+        selectedCityIndex = index
+        val city = citiesList.getOrNull(index) ?: return
+        cityStorage.setActiveCity(city.cityName, city.country, city.latitude, city.longitude)
+        persistCities(citiesList)
     }
 
     // Refresh telemetry for current active city
@@ -139,7 +154,7 @@ fun MainScreen(
         }
     }
 
-    // Auto-detect current device location
+    // Auto-detect current device location and lock it as active default
     fun triggerAutoLocation() {
         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
         coroutineScope.launch {
@@ -159,7 +174,7 @@ fun MainScreen(
                     val filtered = citiesList.filterNot { it.cityName == liveWeather.cityName && it.country == liveWeather.country }
                     citiesList = listOf(liveWeather) + filtered
                     selectedCityIndex = 0
-                    cityStorage.setLastCityIndex(0)
+                    cityStorage.setActiveCity(liveWeather.cityName, liveWeather.country, liveWeather.latitude, liveWeather.longitude)
                     persistCities(citiesList)
                     isSearchExpanded = false
                     searchQuery = ""
@@ -174,43 +189,59 @@ fun MainScreen(
         }
     }
 
-    // High speed parallel initial loading of default and saved cities
+    // Load saved cities and restore user's selected active city
     LaunchedEffect(Unit) {
         isRefreshing = true
         val saved = cityStorage.getSavedLocations()
+        val activeName = cityStorage.getActiveCityName()
 
-        // 1. If no custom locations exist, auto detect user's current city on cold launch
-        if (saved.none { it.isGps }) {
-            launch {
+        val targets = mutableListOf<SavedLocation>()
+        if (saved.isNotEmpty()) {
+            targets.addAll(saved)
+        } else {
+            // If activeCityName was previously saved
+            if (activeName != null) {
+                val activeLat = cityStorage.getActiveCityLat()
+                val activeLon = cityStorage.getActiveCityLon()
+                if (!activeLat.isNaN() && !activeLon.isNaN()) {
+                    targets.add(
+                        SavedLocation(
+                            name = activeName,
+                            country = cityStorage.getActiveCityCountry(),
+                            lat = activeLat,
+                            lon = activeLon,
+                            isCustom = true,
+                            isGps = true
+                        )
+                    )
+                }
+            } else {
+                // First time ever: auto-detect device location!
                 val autoLoc = WeatherApiClient.detectCurrentLocation()
                 if (autoLoc != null) {
-                    val autoWeather = WeatherApiClient.fetchLiveWeather(
-                        name = autoLoc.name,
-                        country = autoLoc.country,
-                        latitude = autoLoc.latitude,
-                        longitude = autoLoc.longitude,
-                        isCustom = true,
-                        isGps = true
+                    targets.add(
+                        SavedLocation(
+                            name = autoLoc.name,
+                            country = autoLoc.country,
+                            lat = autoLoc.latitude,
+                            lon = autoLoc.longitude,
+                            isCustom = true,
+                            isGps = true
+                        )
                     )
-                    if (autoWeather != null) {
-                        citiesList = listOf(autoWeather) + citiesList.filterNot { it.cityName == autoWeather.cityName }
-                        selectedCityIndex = 0
-                        persistCities(citiesList)
-                    }
+                    cityStorage.setActiveCity(autoLoc.name, autoLoc.country, autoLoc.latitude, autoLoc.longitude)
+                }
+            }
+
+            // Append other world cities as secondary choices
+            for (initial in WeatherRepository.initialTargets) {
+                if (targets.none { it.name.equals(initial.name, ignoreCase = true) }) {
+                    targets.add(SavedLocation(initial.name, initial.country, initial.lat, initial.lon, isCustom = false, isGps = false))
                 }
             }
         }
 
-        // Build list of targets to fetch
-        val targets = mutableListOf<SavedLocation>()
-        targets.addAll(saved)
-        for (initial in WeatherRepository.initialTargets) {
-            if (targets.none { it.name.equals(initial.name, ignoreCase = true) }) {
-                targets.add(SavedLocation(initial.name, initial.country, initial.lat, initial.lon, isCustom = false, isGps = false))
-            }
-        }
-
-        // Fetch in parallel using coroutine async
+        // Fetch targets in parallel
         val deferredList = targets.map { target ->
             async {
                 WeatherApiClient.fetchLiveWeather(
@@ -226,9 +257,11 @@ fun MainScreen(
         val results = deferredList.awaitAll().filterNotNull()
         if (results.isNotEmpty()) {
             citiesList = results
-            if (selectedCityIndex >= citiesList.size) {
-                selectedCityIndex = 0
-            }
+            val targetActive = cityStorage.getActiveCityName()
+            val matchIdx = if (targetActive != null) {
+                results.indexOfFirst { it.cityName.equals(targetActive, ignoreCase = true) }
+            } else 0
+            selectedCityIndex = if (matchIdx >= 0) matchIdx else 0
         }
         isRefreshing = false
     }
@@ -240,19 +273,6 @@ fun MainScreen(
     val displayLow = if (isCelsius) currentCity.lowTemp else (currentCity.lowTemp * 9 / 5 + 32)
     val displayFeelsLike = if (isCelsius) currentCity.feelsLike else (currentCity.feelsLike * 9 / 5 + 32)
     val unitSymbol = if (isCelsius) "°C" else "°F"
-
-    val advisoryText = remember(currentCity) {
-        when {
-            currentCity.condition == WeatherCondition.THUNDERSTORM -> "⚡ SEVERE THUNDERSTORM WARNING // LIGHTNING RISK"
-            currentCity.condition == WeatherCondition.RAINY || currentCity.hourly.any { it.precipChance >= 60 } -> "🌧 PRECIPITATION ADVISORY // RAIN SHOWERS EXPECTED"
-            currentCity.windSpeed >= 32 -> "💨 HIGH WIND WARNING (${currentCity.windSpeed} KM/H // GUSTY)"
-            currentCity.uvIndex >= 6 -> "☀ HIGH UV INDEX (${currentCity.uvIndex}) // SUN PROTECTION ADVISED"
-            currentCity.airQuality.aqi > 65 -> "☣ AIR QUALITY CAUTION (AQI ${currentCity.airQuality.aqi}) // ELEVATED PARTICULATES"
-            currentCity.currentTemp <= 0 -> "❄ FREEZING ATMOSPHERE // FROST HAZARD"
-            else -> "✓ OPTIMAL ATMOSPHERIC TELEMETRY // STABLE"
-        }
-    }
-    val isAdvisoryWarning = advisoryText.startsWith("⚡") || advisoryText.startsWith("🌧") || advisoryText.startsWith("💨") || advisoryText.startsWith("☀") || advisoryText.startsWith("☣") || advisoryText.startsWith("❄")
 
     LazyColumn(
         modifier = modifier
@@ -412,7 +432,7 @@ fun MainScreen(
                                     if (liveWeather != null) {
                                         citiesList = listOf(liveWeather) + citiesList.filterNot { it.cityName == liveWeather.cityName }
                                         selectedCityIndex = 0
-                                        cityStorage.setLastCityIndex(0)
+                                        cityStorage.setActiveCity(liveWeather.cityName, liveWeather.country, liveWeather.latitude, liveWeather.longitude)
                                         persistCities(citiesList)
                                         searchQuery = ""
                                         searchResults = emptyList()
@@ -444,7 +464,7 @@ fun MainScreen(
                             if (liveWeather != null) {
                                 citiesList = listOf(liveWeather) + citiesList.filterNot { it.cityName == liveWeather.cityName }
                                 selectedCityIndex = 0
-                                cityStorage.setLastCityIndex(0)
+                                cityStorage.setActiveCity(liveWeather.cityName, liveWeather.country, liveWeather.latitude, liveWeather.longitude)
                                 persistCities(citiesList)
                                 searchQuery = ""
                                 searchResults = emptyList()
@@ -520,11 +540,7 @@ fun MainScreen(
                             .clip(RoundedCornerShape(24.dp))
                             .background(if (isSelected) NothingWhite else NothingCardBg)
                             .border(1.dp, if (isSelected) NothingWhite else NothingCardBorder, RoundedCornerShape(24.dp))
-                            .clickable {
-                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                selectedCityIndex = index
-                                cityStorage.setLastCityIndex(index)
-                            }
+                            .clickable { selectCity(index) }
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -565,7 +581,10 @@ fun MainScreen(
                                         persistCities(citiesList)
                                         if (selectedCityIndex >= citiesList.size) {
                                             selectedCityIndex = (citiesList.size - 1).coerceAtLeast(0)
-                                            cityStorage.setLastCityIndex(selectedCityIndex)
+                                            val newActive = citiesList.getOrNull(selectedCityIndex)
+                                            if (newActive != null) {
+                                                cityStorage.setActiveCity(newActive.cityName, newActive.country, newActive.latitude, newActive.longitude)
+                                            }
                                         }
                                     }
                                 )
@@ -573,71 +592,6 @@ fun MainScreen(
                         }
                     }
                 }
-            }
-        }
-
-        // --- 2.1 CONTEXTUAL WEATHER ADVISORY / SMART ALERT BANNER ---
-        item {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(NothingCardBg)
-                    .border(1.dp, if (isAdvisoryWarning) NothingRed.copy(alpha = 0.6f) else NothingCardBorder, RoundedCornerShape(16.dp))
-                    .padding(horizontal = 14.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(
-                        modifier = Modifier
-                            .size(6.dp)
-                            .clip(CircleShape)
-                            .background(if (isAdvisoryWarning) NothingRed else NothingWhite70)
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = advisoryText,
-                        color = if (isAdvisoryWarning) NothingWhite else NothingWhite70,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = if (isAdvisoryWarning) FontWeight.Bold else FontWeight.Normal,
-                        fontSize = 11.sp,
-                        letterSpacing = 0.5.sp
-                    )
-                }
-
-                // Share Weather Telemetry Button
-                Text(
-                    text = "[SHARE]",
-                    color = NothingWhite40,
-                    fontFamily = FontFamily.Monospace,
-                    fontSize = 10.sp,
-                    modifier = Modifier.clickable {
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        val sendIntent = Intent().apply {
-                            action = Intent.ACTION_SEND
-                            putExtra(
-                                Intent.EXTRA_TEXT,
-                                """
-                                |DOTWEATHER TELEMETRY // NOTHING OS 3.0
-                                |--------------------------------------
-                                |Location: ${currentCity.cityName}, ${currentCity.country}
-                                |Condition: ${currentCity.conditionDesc}
-                                |Current Temp: $displayTemp$unitSymbol (Feels: $displayFeelsLike$unitSymbol)
-                                |High: $displayHigh$unitSymbol | Low: $displayLow$unitSymbol
-                                |Wind: ${currentCity.windSpeed} km/h ${currentCity.windDirection}
-                                |Humidity: ${currentCity.humidity}% | Barometer: ${currentCity.pressureHpa} hPa
-                                |Air Quality: ${currentCity.airQuality.aqi} (${currentCity.airQuality.status})
-                                |Sunrise: ${currentCity.sunrise} | Sunset: ${currentCity.sunset}
-                                |
-                                |Developed by S. M. Mahmud Iqbal
-                                """.trimMargin()
-                            )
-                            type = "text/plain"
-                        }
-                        context.startActivity(Intent.createChooser(sendIntent, "Share Weather Telemetry"))
-                    }
-                )
             }
         }
 
