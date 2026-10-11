@@ -1,6 +1,7 @@
 package com.example.dotweather.ui.components
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -11,13 +12,12 @@ import androidx.compose.ui.unit.dp
 import com.example.dotweather.theme.NothingRed
 import com.example.dotweather.theme.NothingWhite
 import com.example.dotweather.theme.NothingWhite10
-import com.example.dotweather.theme.NothingWhite40
 
 // Author Attribution: Developed by S. M. Mahmud Iqbal
 
 /**
  * Renders characters in a 5x7 dot-matrix grid.
- * Perfectly replicates Nothing OS NDot clock & number style.
+ * Replicates Nothing OS NDot clock & number style.
  */
 object NDotFont {
     val GLYPHS = mapOf(
@@ -163,26 +163,30 @@ object NDotFont {
 fun NDotText(
     text: String,
     modifier: Modifier = Modifier,
-    height: Dp = 48.dp,
+    height: Dp = 54.dp,
     activeColor: Color = NothingWhite,
     inactiveColor: Color = NothingWhite10,
     accentCharIndex: Int = -1,
     accentColor: Color = NothingRed
 ) {
     Canvas(
-        modifier = modifier.height(height)
+        modifier = modifier
+            .fillMaxWidth()
+            .height(height)
     ) {
         val totalChars = text.length
         if (totalChars == 0) return@Canvas
 
-        val charWidth = this.size.height * (5f / 7f)
-        val spacing = charWidth * 0.25f
-        val totalWidth = totalChars * charWidth + (totalChars - 1) * spacing
-        val startX = (this.size.width - totalWidth) / 2f.coerceAtLeast(0f)
-
         val rows = 7
         val cols = 5
-        val dotRadius = (this.size.height / (rows * 2.5f))
+
+        // Determine spacing and charWidth such that it comfortably fits inside canvas bounds
+        val charWidth = (this.size.height * (5f / 7f)).coerceAtMost(this.size.width / (totalChars * 1.35f))
+        val spacing = charWidth * 0.25f
+        val totalWidth = totalChars * charWidth + (totalChars - 1) * spacing
+        val startX = (this.size.width - totalWidth) / 2f
+
+        val dotRadius = (this.size.height / (rows * 2.8f)).coerceAtMost(charWidth / (cols * 2.5f))
         val stepY = this.size.height / rows
         val stepX = charWidth / cols
 

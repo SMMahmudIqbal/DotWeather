@@ -1,8 +1,5 @@
 package com.example.dotweather.ui.main
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,11 +16,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Divider
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -72,6 +67,7 @@ fun MainScreen(
     val displayTemp = if (isCelsius) currentCity.currentTemp else (currentCity.currentTemp * 9 / 5 + 32)
     val displayHigh = if (isCelsius) currentCity.highTemp else (currentCity.highTemp * 9 / 5 + 32)
     val displayLow = if (isCelsius) currentCity.lowTemp else (currentCity.lowTemp * 9 / 5 + 32)
+    val displayFeelsLike = if (isCelsius) currentCity.feelsLike else (currentCity.feelsLike * 9 / 5 + 32)
     val unitSymbol = if (isCelsius) "°C" else "°F"
 
     LazyColumn(
@@ -210,9 +206,10 @@ fun MainScreen(
                                 color = NothingWhite,
                                 fontFamily = FontFamily.Monospace,
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 26.sp,
+                                fontSize = 24.sp,
                                 letterSpacing = 1.5.sp
                             )
+                            Spacer(modifier = Modifier.height(4.dp))
                             Text(
                                 text = currentCity.conditionDesc,
                                 color = NothingWhite40,
@@ -223,20 +220,20 @@ fun MainScreen(
                         }
                         DotMatrixIcon(
                             condition = currentCity.condition,
-                            size = 54.dp
+                            size = 52.dp
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(18.dp))
 
                     // Dot Matrix Digital Temperature Display
                     NDotText(
                         text = "$displayTemp°",
                         modifier = Modifier.fillMaxWidth(),
-                        height = 68.dp
+                        height = 60.dp
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(18.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -258,8 +255,9 @@ fun MainScreen(
                                     .background(NothingRed)
                             )
                             Spacer(modifier = Modifier.width(6.dp))
+                            // FIXED: string interpolation with braces
                             Text(
-                                text = "FEELS $currentCity.feelsLike$unitSymbol",
+                                text = "FEELS ${displayFeelsLike}$unitSymbol",
                                 color = NothingWhite40,
                                 fontFamily = FontFamily.Monospace,
                                 fontSize = 11.sp
@@ -324,6 +322,7 @@ fun MainScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         currentCity.hourly.forEach { hour ->
+                            val hourTemp = if (isCelsius) hour.temp else (hour.temp * 9 / 5 + 32)
                             NothingCard(
                                 modifier = Modifier.width(96.dp),
                                 cornerRadius = 20.dp
@@ -342,7 +341,7 @@ fun MainScreen(
                                     DotMatrixIcon(condition = hour.condition, size = 32.dp)
                                     Spacer(modifier = Modifier.height(10.dp))
                                     Text(
-                                        text = "${hour.temp}°",
+                                        text = "$hourTemp°",
                                         color = NothingWhite,
                                         fontFamily = FontFamily.Monospace,
                                         fontWeight = FontWeight.Bold,
@@ -523,6 +522,8 @@ fun MainScreen(
                                 letterSpacing = 1.sp
                             )
                             currentCity.daily.forEach { forecast ->
+                                val maxTemp = if (isCelsius) forecast.maxTemp else (forecast.maxTemp * 9 / 5 + 32)
+                                val minTemp = if (isCelsius) forecast.minTemp else (forecast.minTemp * 9 / 5 + 32)
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
                                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -542,7 +543,7 @@ fun MainScreen(
                                         horizontalArrangement = Arrangement.End
                                     ) {
                                         Text(
-                                            text = "${forecast.maxTemp}°",
+                                            text = "$maxTemp°",
                                             color = NothingWhite,
                                             fontFamily = FontFamily.Monospace,
                                             fontWeight = FontWeight.Bold,
@@ -550,7 +551,7 @@ fun MainScreen(
                                         )
                                         Spacer(modifier = Modifier.width(10.dp))
                                         Text(
-                                            text = "${forecast.minTemp}°",
+                                            text = "$minTemp°",
                                             color = NothingWhite40,
                                             fontFamily = FontFamily.Monospace,
                                             fontSize = 13.sp
