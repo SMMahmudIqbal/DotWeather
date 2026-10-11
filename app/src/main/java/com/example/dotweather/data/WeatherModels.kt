@@ -42,12 +42,15 @@ data class CityWeather(
     val uvIndex: Int,
     val pressureHpa: Int,
     val visibilityKm: Int,
+    val sunrise: String = "--:--",
+    val sunset: String = "--:--",
     val airQuality: AirQuality,
     val hourly: List<HourlyForecast>,
     val daily: List<DailyForecast>,
     val isCustomLocation: Boolean = false,
     val latitude: Double = 0.0,
-    val longitude: Double = 0.0
+    val longitude: Double = 0.0,
+    val lastUpdated: String = "LIVE"
 )
 
 data class InitialCityTarget(
@@ -85,6 +88,8 @@ object WeatherRepository {
             uvIndex = 3,
             pressureHpa = 1015,
             visibilityKm = 10,
+            sunrise = "06:45",
+            sunset = "18:20",
             airQuality = AirQuality(25, "GOOD", 6.5f, 11.2f, 28.0f, 15.0f),
             hourly = listOf(
                 HourlyForecast("NOW", 16, WeatherCondition.PARTLY_CLOUDY, 10),
@@ -97,7 +102,8 @@ object WeatherRepository {
                 DailyForecast("TOMORROW", 11, 18, WeatherCondition.RAINY)
             ),
             latitude = 51.5074,
-            longitude = -0.1278
+            longitude = -0.1278,
+            lastUpdated = "JUST NOW"
         )
     )
 }

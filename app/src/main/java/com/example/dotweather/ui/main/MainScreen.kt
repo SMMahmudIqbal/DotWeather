@@ -84,6 +84,28 @@ fun MainScreen(
     var networkErrorMsg by remember { mutableStateOf<String?>(null) }
 
     // Initial Live Load: Fetch real-time data for initial world cities asynchronously
+    fun refreshCurrentCity(city: CityWeather) {
+        coroutineScope.launch {
+            isRefreshing = true
+            networkErrorMsg = null
+            val updated = WeatherApiClient.fetchLiveWeather(
+                name = city.cityName,
+                country = city.country,
+                latitude = city.latitude,
+                longitude = city.longitude,
+                isCustom = city.isCustomLocation
+            )
+            if (updated != null) {
+                citiesList = citiesList.mapIndexed { idx, item ->
+                    if (idx == selectedCityIndex) updated else item
+                }
+            } else {
+                networkErrorMsg = "FAILED TO REFRESH TELEMETRY"
+            }
+            isRefreshing = false
+        }
+    }
+
     LaunchedEffect(Unit) {
         isRefreshing = true
         val fetchedList = mutableListOf<CityWeather>()
@@ -348,6 +370,24 @@ fun MainScreen(
                                 fontSize = 12.sp,
                                 letterSpacing = 0.8.sp
                             )
+                            if (city.isCustomLocation && citiesList.size > 1) {
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "×",
+                                    color = if (isSelected) NothingBlack else NothingWhite40,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 14.sp,
+                                    modifier = Modifier.clickable {
+                                        val mutable = citiesList.toMutableList()
+                                        mutable.removeAt(index)
+                                        citiesList = mutable
+                                        if (selectedCityIndex >= citiesList.size) {
+                                            selectedCityIndex = (citiesList.size - 1).coerceAtLeast(0)
+                                        }
+                                    }
+                                )
+                            }
                         }
                     }
                 }
@@ -378,23 +418,21 @@ fun MainScreen(
                                     fontSize = 24.sp,
                                     letterSpacing = 1.5.sp
                                 )
-                                if (currentCity.isCustomLocation) {
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Box(
-                                        modifier = Modifier
-                                            .clip(RoundedCornerShape(10.dp))
-                                            .background(NothingCardInner)
-                                            .border(1.dp, NothingCardBorder, RoundedCornerShape(10.dp))
-                                            .padding(horizontal = 6.dp, vertical = 2.dp)
-                                    ) {
-                                        Text(
-                                            text = "LIVE",
-                                            color = NothingRed,
-                                            fontFamily = FontFamily.Monospace,
-                                            fontSize = 9.sp,
-                                            fontWeight = FontWeight.Bold
-                                        )
-                                    }
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(NothingCardInner)
+                                        .border(1.dp, NothingCardBorder, RoundedCornerShape(10.dp))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "LIVE ${currentCity.lastUpdated}",
+                                        color = NothingRed,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
                             }
                             Spacer(modifier = Modifier.height(3.dp))
@@ -406,10 +444,14 @@ fun MainScreen(
                                 letterSpacing = 0.5.sp
                             )
                         }
-                        DotMatrixIcon(
-                            condition = currentCity.condition,
-                            size = 52.dp
-                        )
+
+                        // Tap dot matrix weather icon to immediately re-sync live telemetry
+                        Box(modifier = Modifier.clickable { refreshCurrentCity(currentCity) }) {
+                            DotMatrixIcon(
+                                condition = currentCity.condition,
+                                size = 52.dp
+                            )
+                        }
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
@@ -562,7 +604,7 @@ fun MainScreen(
                     }
                 }
 
-                // ENVIRONMENTAL SENSORS
+                // ENVIRONMENTAL SENSORS (Expanded: Wind, Humidity, UV, Barometer, Sunrise, Sunset)
                 item {
                     Text(
                         text = "ENVIRONMENTAL SENSORS",
@@ -597,7 +639,8 @@ fun MainScreen(
                                 Text("HUMIDITY", color = NothingWhite40, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text("${currentCity.humidity}%", color = NothingWhite, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-                                Text("DEW POINT 11°", color = NothingWhite70, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
+                                val dewPoint = currentCity.currentTemp - ((100 - currentCity.humidity) / 5)
+                                Text("DEW POINT ${dewPoint}°", color = NothingWhite70, fontFamily = FontFamily.Monospace, fontSize = 11.sp)
                             }
                         }
                     }
@@ -630,6 +673,37 @@ fun MainScreen(
                                 Spacer(modifier = Modifier.height(8.dp))
                                 Text("${currentCity.pressureHpa} hPa", color = NothingWhite, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 17.sp)
                                 Text("STEADY", color = NothingWhite70, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                            }
+                        }
+                    }
+                }
+
+                // SUNRISE & SUNSET METRIC CARDS
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        NothingCard(
+                            modifier = Modifier.weight(1f),
+                            cornerRadius = 22.dp
+                        ) {
+                            Column {
+                                Text("SUNRISE", color = NothingWhite40, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(currentCity.sunrise, color = NothingWhite, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                                Text("DAWN ORBIT", color = NothingWhite70, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                            }
+                        }
+                        NothingCard(
+                            modifier = Modifier.weight(1f),
+                            cornerRadius = 22.dp
+                        ) {
+                            Column {
+                                Text("SUNSET", color = NothingWhite40, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(currentCity.sunset, color = NothingWhite, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+                                Text("DUSK ORBIT", color = NothingWhite70, fontFamily = FontFamily.Monospace, fontSize = 10.sp)
                             }
                         }
                     }

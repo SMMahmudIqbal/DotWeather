@@ -56,7 +56,7 @@ object WeatherApiClient {
         conn.requestMethod = "GET"
         conn.connectTimeout = 8000
         conn.readTimeout = 8000
-        conn.setRequestProperty("User-Agent", "DotWeather-Android-NothingOS/1.2")
+        conn.setRequestProperty("User-Agent", "DotWeather-Android-NothingOS/1.3")
         conn.inputStream.bufferedReader().use { reader ->
             return reader.readText()
         }
@@ -100,8 +100,8 @@ object WeatherApiClient {
         isCustom: Boolean = false
     ): CityWeather? = withContext(Dispatchers.IO) {
         try {
-            // 1. Fetch Forecast
-            val weatherUrl = "https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,surface_pressure,wind_speed_10m,wind_direction_10m&hourly=temperature_2m,precipitation_probability,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,uv_index_max&timezone=auto"
+            // 1. Fetch Forecast with Sunrise & Sunset
+            val weatherUrl = "https://api.open-meteo.com/v1/forecast?latitude=$latitude&longitude=$longitude&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,surface_pressure,wind_speed_10m,wind_direction_10m&hourly=temperature_2m,precipitation_probability,weather_code&daily=weather_code,temperature_2m_max,temperature_2m_min,uv_index_max,sunrise,sunset&timezone=auto"
             val weatherResponse = httpGet(weatherUrl)
             val weatherJson = JSONObject(weatherResponse)
 
@@ -125,10 +125,30 @@ object WeatherApiClient {
             val dailyMaxs = daily.getJSONArray("temperature_2m_max")
             val dailyMins = daily.getJSONArray("temperature_2m_min")
             val dailyUv = daily.optJSONArray("uv_index_max")
+            val dailySunrise = daily.optJSONArray("sunrise")
+            val dailySunset = daily.optJSONArray("sunset")
 
             val todayHigh = if (dailyMaxs.length() > 0) dailyMaxs.getDouble(0).toInt() else currentTemp + 3
             val todayLow = if (dailyMins.length() > 0) dailyMins.getDouble(0).toInt() else currentTemp - 4
             val todayUv = if (dailyUv != null && dailyUv.length() > 0) dailyUv.getDouble(0).toInt() else 4
+
+            val timeExtractFormat = SimpleDateFormat("HH:mm", Locale.ENGLISH)
+            val isoParser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm", Locale.ENGLISH)
+
+            var sunriseStr = "--:--"
+            var sunsetStr = "--:--"
+            if (dailySunrise != null && dailySunrise.length() > 0) {
+                try {
+                    val parsed = isoParser.parse(dailySunrise.getString(0))
+                    if (parsed != null) sunriseStr = timeExtractFormat.format(parsed)
+                } catch (e: Exception) { /* fallback */ }
+            }
+            if (dailySunset != null && dailySunset.length() > 0) {
+                try {
+                    val parsed = isoParser.parse(dailySunset.getString(0))
+                    if (parsed != null) sunsetStr = timeExtractFormat.format(parsed)
+                } catch (e: Exception) { /* fallback */ }
+            }
 
             val dateFormat = SimpleDateFormat("yyyy-MM-dd", Locale.ENGLISH)
             val dayNameFormat = SimpleDateFormat("EEE", Locale.ENGLISH)
@@ -152,7 +172,7 @@ object WeatherApiClient {
                 dailyForecasts.add(DailyForecast(dayName, dMin, dMax, dCond))
             }
 
-            // Hourly Forecast (Next 10 hours)
+            // Hourly Forecast (Next 12 hours)
             val hourly = weatherJson.getJSONObject("hourly")
             val hourlyTimes = hourly.getJSONArray("time")
             val hourlyTemps = hourly.getJSONArray("temperature_2m")
@@ -160,15 +180,14 @@ object WeatherApiClient {
             val hourlyCodes = hourly.getJSONArray("weather_code")
 
             val hourlyForecasts = mutableListOf<HourlyForecast>()
-            val timeParser = SimpleDateFormat("yyyy-MM-dd'T'HH:mm", Locale.ENGLISH)
             val hourDisplayFormat = SimpleDateFormat("HH:mm", Locale.ENGLISH)
 
-            val countHourly = minOf(hourlyTimes.length(), 10)
+            val countHourly = minOf(hourlyTimes.length(), 14)
             for (i in 0 until countHourly) {
                 val rawTime = hourlyTimes.getString(i)
                 val displayTime = if (i == 0) "NOW" else {
                     try {
-                        val parsed = timeParser.parse(rawTime)
+                        val parsed = isoParser.parse(rawTime)
                         hourDisplayFormat.format(parsed ?: Date())
                     } catch (e: Exception) {
                         "+${i}H"
@@ -214,6 +233,9 @@ object WeatherApiClient {
                 // Keep default calculated values if AQI endpoint has momentary lag
             }
 
+            val updateTimeFormat = SimpleDateFormat("HH:mm", Locale.ENGLISH)
+            val updateTimestamp = updateTimeFormat.format(Date())
+
             CityWeather(
                 cityName = name.uppercase(),
                 country = country.uppercase(),
@@ -229,10 +251,15 @@ object WeatherApiClient {
                 uvIndex = todayUv,
                 pressureHpa = pressure,
                 visibilityKm = 10,
+                sunrise = sunriseStr,
+                sunset = sunsetStr,
                 airQuality = airQuality,
                 hourly = hourlyForecasts,
                 daily = dailyForecasts,
-                isCustomLocation = isCustom
+                isCustomLocation = isCustom,
+                latitude = latitude,
+                longitude = longitude,
+                lastUpdated = updateTimestamp
             )
         } catch (e: Exception) {
             e.printStackTrace()
