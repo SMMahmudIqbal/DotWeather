@@ -13,11 +13,11 @@ A hyper-minimalist Android weather and environmental sensor monitor inspired by 
 - **🌙 Astronomical Lunar Ephemeris & Moon Tracker**: Precision synodic moon phase tracker (New Moon, Waxing Crescent, First Quarter, Gibbous, Full Moon) with procedural 7x7 dot-matrix moon icons, illumination percentage, and orbital trajectory.
 - **🛡️ Actionable Environmental Health Directives**: Real-time contextual activity guidance based on WHO air quality benchmarks (outdoor exercise safety, natural window ventilation, and respiratory protection).
 - **⚡ Instant Offline Telemetry Caching**: Seamless cold-boot offline caching displaying full saved telemetry immediately without waiting or network delays.
-- **🧩 3 Dedicated Nothing OS Home Screen Widgets**:
+- **🧩 3 Dedicated Nothing OS Home Screen Widgets (Launcher Long-Press)**:
   1. **Weather Quick Glance (2x2)**: Minimalist Nothing squircle with 7x7 procedural dot-matrix weather icon, live temperature, condition label, high/low range, and signature Nothing Red status dot.
   2. **Hourly Forecast Timeline Strip (4x2)**: Multi-hour horizontal strip featuring upcoming hours (`NOW`, `+1H`, `+2H`, `+3H`), mini dot-matrix condition indicators, temperatures, and rain precipitation percentage.
   3. **Environmental & AQI Hub (2x2)**: Sensor dashboard featuring real-time numeric AQI score, procedural circular dot-matrix LED gauge, PM2.5, wind speed/direction, humidity, and UV index.
-- **⚡ 1-Tap Home Screen Pinning**: Pin any of the 3 widgets directly to your Android home screen with 1 tap from inside the app (`AppWidgetManager.requestPinAppWidget()`) or long-press your home screen widget menu.
+- **⚡ Clean UI Experience**: In-app UI remains completely clean and clutter-free. Widgets are accessible exclusively via standard Android home screen widget selection (touch and hold / long-press any empty space on your home screen or long-press the DotWeather app icon).
 - **📍 Default Active Location Persistence**: Remembers your chosen city and default temperature unit across app restarts and background termination.
 - **🧭 Auto-Detect Location**: Instant GPS & IP-based automatic device geolocation detecting your exact city anywhere worldwide on launch.
 - **🌍 Live Global Telemetry**: 100% real-time weather and air quality data powered by Open-Meteo (no API keys required, ultra-fast response).
@@ -35,8 +35,8 @@ A hyper-minimalist Android weather and environmental sensor monitor inspired by 
 ## 📦 Download Latest APK Release
 
 Download the official signed release APK from the GitHub Releases tab:
-- **Latest Release**: [v1.8.1 (GitHub Release)](https://github.com/SMMahmudIqbal/DotWeather/releases/latest)
-- **Asset**: `DotWeather-v1.8.1.apk`
+- **Latest Release**: [v1.8.2 (GitHub Release)](https://github.com/SMMahmudIqbal/DotWeather/releases/latest)
+- **Asset**: `DotWeather-v1.8.2.apk`
 
 ---
 
