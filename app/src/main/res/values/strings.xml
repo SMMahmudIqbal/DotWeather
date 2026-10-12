@@ -1,3 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Developed by S. M. Mahmud Iqbal -->
 <resources>
     <string name="app_name">DotWeather</string>
+    <string name="widget_quick_name">Nothing Weather (2x2)</string>
+    <string name="widget_quick_desc">Nothing OS Weather squircle with dot-matrix icon and live telemetry</string>
+    <string name="widget_forecast_name">Nothing Forecast Strip (4x2)</string>
+    <string name="widget_forecast_desc">Nothing OS multi-hour forecast timeline strip with dot-matrix icons</string>
+    <string name="widget_aqi_name">Nothing Air &amp; Sensor Hub (2x2)</string>
+    <string name="widget_aqi_desc">Nothing OS environmental hub displaying AQI, PM2.5, wind, humidity, and UV</string>
 </resources>

@@ -16,6 +16,7 @@
         android:supportsRtl="true"
         android:windowSoftInputMode="adjustResize"
         android:theme="@style/Theme.DotWeather">
+        
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -24,6 +25,46 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Widget 1: Minimalist Weather Squircle (2x2) -->
+        <receiver
+            android:name=".widget.WeatherQuickWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_quick_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_quick_weather_info" />
+        </receiver>
+
+        <!-- Widget 2: Hourly Forecast Strip (4x2) -->
+        <receiver
+            android:name=".widget.WeatherForecastWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_forecast_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_forecast_strip_info" />
+        </receiver>
+
+        <!-- Widget 3: Air Quality & Sensor Hub (2x2) -->
+        <receiver
+            android:name=".widget.WeatherAirQualityWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_aqi_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_air_quality_info" />
+        </receiver>
+
     </application>
 
 </manifest>

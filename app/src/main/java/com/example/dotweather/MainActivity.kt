@@ -11,7 +11,7 @@ import androidx.core.view.WindowCompat
 import com.example.dotweather.theme.DotWeatherTheme
 import com.example.dotweather.theme.NothingBlack
 
-// Developed by S. M. Mahmud Iqbal
+// Author Attribution: Developed by S. M. Mahmud Iqbal
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -24,13 +24,15 @@ class MainActivity : ComponentActivity() {
             isAppearanceLightNavigationBars = false
         }
 
+        val targetTab = intent?.getIntExtra("TARGET_TAB", -1) ?: -1
+
         setContent {
             DotWeatherTheme(darkTheme = true) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = NothingBlack
                 ) {
-                    MainNavigation()
+                    MainNavigation(initialTab = targetTab)
                 }
             }
         }

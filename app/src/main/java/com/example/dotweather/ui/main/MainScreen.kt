@@ -73,11 +73,22 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 
+import android.appwidget.AppWidgetManager
+import android.content.ComponentName
+import android.os.Build
+import android.widget.Toast
+import com.example.dotweather.widget.WeatherAirQualityWidgetProvider
+import com.example.dotweather.widget.WeatherForecastWidgetProvider
+import com.example.dotweather.widget.WeatherQuickWidgetProvider
+import com.example.dotweather.widget.WidgetDataStorage
+import com.example.dotweather.widget.WidgetUpdateManager
+
 // Author Attribution: Developed by S. M. Mahmud Iqbal
 
 @Composable
 fun MainScreen(
     onItemClick: () -> Unit = {},
+    initialTab: Int = -1,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -96,13 +107,23 @@ fun MainScreen(
     }
     var selectedCityIndex by remember { mutableIntStateOf(0) }
     var isCelsius by remember { mutableStateOf(cityStorage.getUnitIsCelsius()) }
-    var selectedTab by remember { mutableIntStateOf(0) } // 0: HOURLY, 1: AIR QUALITY, 2: 7-DAY
+    var selectedTab by remember { mutableIntStateOf(if (initialTab in 0..2) initialTab else 0) } // 0: HOURLY, 1: AIR QUALITY, 2: 7-DAY
     var isSearchExpanded by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var searchResults by remember { mutableStateOf<List<WeatherApiClient.GeoResult>>(emptyList()) }
     var isRefreshing by remember { mutableStateOf(false) }
     var isLocating by remember { mutableStateOf(false) }
     var networkErrorMsg by remember { mutableStateOf<String?>(null) }
+
+    // Synchronize home screen widgets with current telemetry
+    fun syncWidgets(city: CityWeather, celsius: Boolean) {
+        try {
+            WidgetDataStorage.saveLatestWeather(context, city, celsius)
+            WidgetUpdateManager.updateAllWidgets(context)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
 
     // Synchronize all saved cities to persistent local storage
     fun persistCities(list: List<CityWeather>) {
@@ -126,6 +147,7 @@ fun MainScreen(
         val city = citiesList.getOrNull(index) ?: return
         cityStorage.setActiveCity(city.cityName, city.country, city.latitude, city.longitude)
         persistCities(citiesList)
+        syncWidgets(city, isCelsius)
     }
 
     // Refresh telemetry for current active city
@@ -147,6 +169,7 @@ fun MainScreen(
                     if (idx == selectedCityIndex) updated else item
                 }
                 persistCities(citiesList)
+                syncWidgets(updated, isCelsius)
             } else {
                 networkErrorMsg = "FAILED TO REFRESH TELEMETRY"
             }
@@ -176,6 +199,7 @@ fun MainScreen(
                     selectedCityIndex = 0
                     cityStorage.setActiveCity(liveWeather.cityName, liveWeather.country, liveWeather.latitude, liveWeather.longitude)
                     persistCities(citiesList)
+                    syncWidgets(liveWeather, isCelsius)
                     isSearchExpanded = false
                     searchQuery = ""
                     searchResults = emptyList()
@@ -262,6 +286,10 @@ fun MainScreen(
                 results.indexOfFirst { it.cityName.equals(targetActive, ignoreCase = true) }
             } else 0
             selectedCityIndex = if (matchIdx >= 0) matchIdx else 0
+            val current = results.getOrNull(selectedCityIndex) ?: results.firstOrNull()
+            if (current != null) {
+                syncWidgets(current, isCelsius)
+            }
         }
         isRefreshing = false
     }
@@ -352,6 +380,7 @@ fun MainScreen(
                                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                         isCelsius = true
                                         cityStorage.setUnitIsCelsius(true)
+                                        syncWidgets(currentCity, true)
                                     }
                                 }
                                 .padding(horizontal = 9.dp, vertical = 5.dp),
@@ -376,6 +405,7 @@ fun MainScreen(
                                         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                                         isCelsius = false
                                         cityStorage.setUnitIsCelsius(false)
+                                        syncWidgets(currentCity, false)
                                     }
                                 }
                                 .padding(horizontal = 9.dp, vertical = 5.dp),
@@ -466,6 +496,7 @@ fun MainScreen(
                                 selectedCityIndex = 0
                                 cityStorage.setActiveCity(liveWeather.cityName, liveWeather.country, liveWeather.latitude, liveWeather.longitude)
                                 persistCities(citiesList)
+                                syncWidgets(liveWeather, isCelsius)
                                 searchQuery = ""
                                 searchResults = emptyList()
                                 isSearchExpanded = false
@@ -1140,6 +1171,28 @@ fun MainScreen(
             }
         }
 
+        // --- 5. NOTHING OS HOME SCREEN WIDGETS SECTION ---
+        item {
+            NothingWidgetsSection(
+                currentCity = currentCity,
+                isCelsius = isCelsius,
+                onPinWidget = { providerClass ->
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        val appWidgetManager = AppWidgetManager.getInstance(context)
+                        if (appWidgetManager.isRequestPinAppWidgetSupported) {
+                            val provider = ComponentName(context, providerClass)
+                            appWidgetManager.requestPinAppWidget(provider, null, null)
+                            Toast.makeText(context, "PINNING WIDGET TO HOME SCREEN...", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "LAUNCHER PINNING NOT SUPPORTED. TOUCH & HOLD HOME SCREEN TO ADD.", Toast.LENGTH_LONG).show()
+                        }
+                    } else {
+                        Toast.makeText(context, "TOUCH & HOLD HOME SCREEN TO ADD WIDGET.", Toast.LENGTH_LONG).show()
+                    }
+                }
+            )
+        }
+
         // --- 6. DEVELOPER ATTRIBUTION FOOTER ---
         item {
             Spacer(modifier = Modifier.height(10.dp))
@@ -1169,6 +1222,514 @@ fun MainScreen(
                 }
             }
             Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+}
+
+@Composable
+fun NothingWidgetsSection(
+    currentCity: CityWeather,
+    isCelsius: Boolean,
+    onPinWidget: (Class<*>) -> Unit
+) {
+    val displayTemp = if (isCelsius) currentCity.currentTemp else (currentCity.currentTemp * 9 / 5 + 32)
+    val displayHigh = if (isCelsius) currentCity.highTemp else (currentCity.highTemp * 9 / 5 + 32)
+    val displayLow = if (isCelsius) currentCity.lowTemp else (currentCity.lowTemp * 9 / 5 + 32)
+    val unitSymbol = if (isCelsius) "°C" else "°F"
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        // Section Header
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(7.dp)
+                        .clip(CircleShape)
+                        .background(NothingRed)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = "NOTHING WIDGETS",
+                    color = NothingWhite,
+                    fontFamily = FontFamily.Monospace,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    letterSpacing = 1.sp
+                )
+            }
+            Text(
+                text = "// 3 HOMESCREEN STYLES",
+                color = NothingWhite40,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 9.sp,
+                letterSpacing = 0.5.sp
+            )
+        }
+
+        Text(
+            text = "Authentic Nothing OS 3.0 widgets. Tap PIN to add directly or long-press your home screen.",
+            color = NothingWhite40,
+            fontFamily = FontFamily.Monospace,
+            fontSize = 10.sp,
+            lineHeight = 14.sp
+        )
+
+        // 1. WIDGET 1: WEATHER QUICK GLANCE (2x2)
+        NothingCard(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = NothingCardBg,
+            borderColor = NothingCardBorder,
+            cornerRadius = 20.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "01 // QUICK GLANCE (2X2)",
+                        color = NothingWhite,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    )
+                    Text(
+                        text = "SQUIRCLE",
+                        color = NothingWhite40,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 9.sp
+                    )
+                }
+
+                // Interactive Mini Preview
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .border(1.dp, NothingCardBorder, RoundedCornerShape(16.dp))
+                        .background(NothingBlack)
+                        .padding(14.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(NothingRed)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "${currentCity.cityName} // ${currentCity.country}",
+                                    color = NothingWhite,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.sp
+                                )
+                            }
+                            Text(
+                                text = "LIVE",
+                                color = NothingWhite40,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 9.sp
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            DotMatrixIcon(
+                                condition = currentCity.condition,
+                                size = 46.dp
+                            )
+                            Text(
+                                text = "$displayTemp$unitSymbol",
+                                color = NothingWhite,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 32.sp
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = currentCity.conditionDesc.uppercase(),
+                                color = NothingWhite70,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 10.sp
+                            )
+                            Text(
+                                text = "H:$displayHigh° L:$displayLow°",
+                                color = NothingWhite40,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 9.sp
+                            )
+                        }
+                    }
+                }
+
+                // Pin Button
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(1.dp, NothingWhite20, RoundedCornerShape(12.dp))
+                        .background(NothingCardInner)
+                        .clickable { onPinWidget(WeatherQuickWidgetProvider::class.java) }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(NothingRed)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "+ PIN QUICK GLANCE TO HOME SCREEN",
+                            color = NothingWhite,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        // 2. WIDGET 2: HOURLY FORECAST STRIP (4x2)
+        NothingCard(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = NothingCardBg,
+            borderColor = NothingCardBorder,
+            cornerRadius = 20.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "02 // FORECAST STRIP (4X2)",
+                        color = NothingWhite,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    )
+                    Text(
+                        text = "TIMELINE",
+                        color = NothingWhite40,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 9.sp
+                    )
+                }
+
+                // Mini Preview
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .border(1.dp, NothingCardBorder, RoundedCornerShape(16.dp))
+                        .background(NothingBlack)
+                        .padding(12.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(NothingRed)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = currentCity.cityName,
+                                    color = NothingWhite,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "// HOURLY STRIP",
+                                    color = NothingWhite40,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontSize = 8.sp
+                                )
+                            }
+                            Text(
+                                text = "$displayTemp°",
+                                color = NothingWhite,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 10.sp
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceAround,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            currentCity.hourly.take(4).forEach { h ->
+                                val hTemp = if (isCelsius) h.temp else (h.temp * 9 / 5 + 32)
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.spacedBy(3.dp)
+                                ) {
+                                    Text(
+                                        text = h.time,
+                                        color = NothingWhite40,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 8.sp
+                                    )
+                                    DotMatrixIcon(
+                                        condition = h.condition,
+                                        size = 22.dp
+                                    )
+                                    Text(
+                                        text = "$hTemp°",
+                                        color = NothingWhite,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 10.sp
+                                    )
+                                    Text(
+                                        text = "${h.precipChance}%",
+                                        color = NothingWhite40,
+                                        fontFamily = FontFamily.Monospace,
+                                        fontSize = 7.sp
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Pin Button
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(1.dp, NothingWhite20, RoundedCornerShape(12.dp))
+                        .background(NothingCardInner)
+                        .clickable { onPinWidget(WeatherForecastWidgetProvider::class.java) }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(NothingRed)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "+ PIN FORECAST STRIP TO HOME SCREEN",
+                            color = NothingWhite,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                }
+            }
+        }
+
+        // 3. WIDGET 3: AIR QUALITY & ENVIRONMENTAL HUB (2x2)
+        NothingCard(
+            modifier = Modifier.fillMaxWidth(),
+            backgroundColor = NothingCardBg,
+            borderColor = NothingCardBorder,
+            cornerRadius = 20.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "03 // SENSOR & AQI HUB (2X2)",
+                        color = NothingWhite,
+                        fontFamily = FontFamily.Monospace,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 11.sp
+                    )
+                    Text(
+                        text = "ENVIRONMENT",
+                        color = NothingWhite40,
+                        fontFamily = FontFamily.Monospace,
+                        fontSize = 9.sp
+                    )
+                }
+
+                // Mini Preview
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .border(1.dp, NothingCardBorder, RoundedCornerShape(16.dp))
+                        .background(NothingBlack)
+                        .padding(14.dp)
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(6.dp)
+                                        .clip(CircleShape)
+                                        .background(NothingRed)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "AIR // AQI",
+                                    color = NothingWhite,
+                                    fontFamily = FontFamily.Monospace,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp
+                                )
+                            }
+                            Text(
+                                text = currentCity.airQuality.status.uppercase(),
+                                color = NothingWhite,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 8.sp,
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .border(1.dp, NothingCardBorder, RoundedCornerShape(10.dp))
+                                    .background(NothingCardInner)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = currentCity.airQuality.aqi.toString(),
+                                color = NothingWhite,
+                                fontFamily = FontFamily.Monospace,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 32.sp
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "INDEX",
+                                color = NothingWhite40,
+                                fontFamily = FontFamily.Monospace,
+                                fontSize = 9.sp
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column {
+                                Text("PM2.5", color = NothingWhite40, fontFamily = FontFamily.Monospace, fontSize = 7.sp)
+                                Text("${currentCity.airQuality.pm25} µg", color = NothingWhite, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 9.sp)
+                            }
+                            Column {
+                                Text("WIND", color = NothingWhite40, fontFamily = FontFamily.Monospace, fontSize = 7.sp)
+                                Text("${currentCity.windSpeed} KM/H", color = NothingWhite, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 9.sp)
+                            }
+                            Column {
+                                Text("HUMIDITY", color = NothingWhite40, fontFamily = FontFamily.Monospace, fontSize = 7.sp)
+                                Text("${currentCity.humidity}%", color = NothingWhite, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 9.sp)
+                            }
+                            Column {
+                                Text("UV INDEX", color = NothingWhite40, fontFamily = FontFamily.Monospace, fontSize = 7.sp)
+                                Text("${currentCity.uvIndex}", color = NothingWhite, fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Bold, fontSize = 9.sp)
+                            }
+                        }
+                    }
+                }
+
+                // Pin Button
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .border(1.dp, NothingWhite20, RoundedCornerShape(12.dp))
+                        .background(NothingCardInner)
+                        .clickable { onPinWidget(WeatherAirQualityWidgetProvider::class.java) }
+                        .padding(vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(NothingRed)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "+ PIN SENSOR HUB TO HOME SCREEN",
+                            color = NothingWhite,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 10.sp,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+                }
+            }
         }
     }
 }

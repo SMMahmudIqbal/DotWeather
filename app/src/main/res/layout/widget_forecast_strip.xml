@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Developed by S. M. Mahmud Iqbal -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_forecast_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_card_bg"
+    android:orientation="vertical"
+    android:padding="14dp">
+
+    <!-- Top Header Row -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:layout_width="6dp"
+            android:layout_height="6dp"
+            android:contentDescription="Nothing Red Accent"
+            android:src="@drawable/widget_red_dot" />
+
+        <TextView
+            android:id="@+id/widget_forecast_city"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="DHAKA"
+            android:textColor="@color/nothing_white"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:typeface="monospace" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:layout_weight="1"
+            android:text="// HOURLY TIMELINE"
+            android:textColor="@color/nothing_white_40"
+            android:textSize="9sp"
+            android:typeface="monospace" />
+
+        <TextView
+            android:id="@+id/widget_forecast_current_temp"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="32°"
+            android:textColor="@color/nothing_white"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:typeface="monospace" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <!-- 4-Column Timeline -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
+
+        <!-- Hour 0 -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_forecast_time_0"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="NOW"
+                android:textColor="@color/nothing_white_50"
+                android:textSize="9sp"
+                android:typeface="monospace" />
+
+            <ImageView
+                android:id="@+id/widget_forecast_icon_0"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="4dp"
+                android:contentDescription="Condition Icon"
+                android:scaleType="fitCenter" />
+
+            <TextView
+                android:id="@+id/widget_forecast_temp_0"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="32°"
+                android:textColor="@color/nothing_white"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:typeface="monospace" />
+
+            <TextView
+                android:id="@+id/widget_forecast_pop_0"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="0%"
+                android:textColor="@color/nothing_white_40"
+                android:textSize="8sp"
+                android:typeface="monospace" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="48dp"
+            android:background="@drawable/widget_divider" />
+
+        <!-- Hour 1 -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_forecast_time_1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+1H"
+                android:textColor="@color/nothing_white_50"
+                android:textSize="9sp"
+                android:typeface="monospace" />
+
+            <ImageView
+                android:id="@+id/widget_forecast_icon_1"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="4dp"
+                android:contentDescription="Condition Icon"
+                android:scaleType="fitCenter" />
+
+            <TextView
+                android:id="@+id/widget_forecast_temp_1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="32°"
+                android:textColor="@color/nothing_white"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:typeface="monospace" />
+
+            <TextView
+                android:id="@+id/widget_forecast_pop_1"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="0%"
+                android:textColor="@color/nothing_white_40"
+                android:textSize="8sp"
+                android:typeface="monospace" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="48dp"
+            android:background="@drawable/widget_divider" />
+
+        <!-- Hour 2 -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_forecast_time_2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+2H"
+                android:textColor="@color/nothing_white_50"
+                android:textSize="9sp"
+                android:typeface="monospace" />
+
+            <ImageView
+                android:id="@+id/widget_forecast_icon_2"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="4dp"
+                android:contentDescription="Condition Icon"
+                android:scaleType="fitCenter" />
+
+            <TextView
+                android:id="@+id/widget_forecast_temp_2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="31°"
+                android:textColor="@color/nothing_white"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:typeface="monospace" />
+
+            <TextView
+                android:id="@+id/widget_forecast_pop_2"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="5%"
+                android:textColor="@color/nothing_white_40"
+                android:textSize="8sp"
+                android:typeface="monospace" />
+        </LinearLayout>
+
+        <View
+            android:layout_width="1dp"
+            android:layout_height="48dp"
+            android:background="@drawable/widget_divider" />
+
+        <!-- Hour 3 -->
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:gravity="center_horizontal"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/widget_forecast_time_3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="+3H"
+                android:textColor="@color/nothing_white_50"
+                android:textSize="9sp"
+                android:typeface="monospace" />
+
+            <ImageView
+                android:id="@+id/widget_forecast_icon_3"
+                android:layout_width="26dp"
+                android:layout_height="26dp"
+                android:layout_marginTop="4dp"
+                android:layout_marginBottom="4dp"
+                android:contentDescription="Condition Icon"
+                android:scaleType="fitCenter" />
+
+            <TextView
+                android:id="@+id/widget_forecast_temp_3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="29°"
+                android:textColor="@color/nothing_white"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                android:typeface="monospace" />
+
+            <TextView
+                android:id="@+id/widget_forecast_pop_3"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="2dp"
+                android:text="10%"
+                android:textColor="@color/nothing_white_40"
+                android:textSize="8sp"
+                android:typeface="monospace" />
+        </LinearLayout>
+
+    </LinearLayout>
+
+</LinearLayout>

@@ -3,4 +3,15 @@
 <resources>
     <color name="black">#000000</color>
     <color name="white">#FFFFFF</color>
+    <color name="nothing_black">#000000</color>
+    <color name="nothing_card_bg">#0A0A0A</color>
+    <color name="nothing_card_border">#222222</color>
+    <color name="nothing_card_inner">#141414</color>
+    <color name="nothing_red">#D71920</color>
+    <color name="nothing_white">#FFFFFF</color>
+    <color name="nothing_white_70">#B3FFFFFF</color>
+    <color name="nothing_white_50">#80FFFFFF</color>
+    <color name="nothing_white_40">#66FFFFFF</color>
+    <color name="nothing_white_20">#33FFFFFF</color>
+    <color name="nothing_white_10">#1AFFFFFF</color>
 </resources>
