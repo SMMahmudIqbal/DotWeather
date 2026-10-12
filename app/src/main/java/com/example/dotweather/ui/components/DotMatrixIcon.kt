@@ -98,6 +98,94 @@ object DotMatrixPatterns {
         intArrayOf(1, 0, 1, 1, 1, 0, 1),
         intArrayOf(0, 1, 0, 1, 0, 1, 0),
     )
+
+    val MOON_FULL = arrayOf(
+        intArrayOf(0, 0, 1, 1, 1, 0, 0),
+        intArrayOf(0, 1, 1, 1, 1, 1, 0),
+        intArrayOf(1, 1, 1, 1, 1, 1, 1),
+        intArrayOf(1, 1, 1, 1, 1, 1, 1),
+        intArrayOf(1, 1, 1, 1, 1, 1, 1),
+        intArrayOf(0, 1, 1, 1, 1, 1, 0),
+        intArrayOf(0, 0, 1, 1, 1, 0, 0),
+    )
+
+    val MOON_CRESCENT = arrayOf(
+        intArrayOf(0, 0, 0, 0, 1, 0, 0),
+        intArrayOf(0, 0, 0, 1, 1, 1, 0),
+        intArrayOf(0, 0, 0, 0, 1, 1, 1),
+        intArrayOf(0, 0, 0, 0, 1, 1, 1),
+        intArrayOf(0, 0, 0, 0, 1, 1, 1),
+        intArrayOf(0, 0, 0, 1, 1, 1, 0),
+        intArrayOf(0, 0, 0, 0, 1, 0, 0),
+    )
+
+    val MOON_QUARTER = arrayOf(
+        intArrayOf(0, 0, 0, 1, 1, 0, 0),
+        intArrayOf(0, 0, 0, 1, 1, 1, 0),
+        intArrayOf(0, 0, 0, 1, 1, 1, 1),
+        intArrayOf(0, 0, 0, 1, 1, 1, 1),
+        intArrayOf(0, 0, 0, 1, 1, 1, 1),
+        intArrayOf(0, 0, 0, 1, 1, 1, 0),
+        intArrayOf(0, 0, 0, 1, 1, 0, 0),
+    )
+
+    val MOON_GIBBOUS = arrayOf(
+        intArrayOf(0, 0, 1, 1, 1, 0, 0),
+        intArrayOf(0, 1, 1, 1, 1, 1, 0),
+        intArrayOf(0, 1, 1, 1, 1, 1, 1),
+        intArrayOf(0, 1, 1, 1, 1, 1, 1),
+        intArrayOf(0, 1, 1, 1, 1, 1, 1),
+        intArrayOf(0, 1, 1, 1, 1, 1, 0),
+        intArrayOf(0, 0, 1, 1, 1, 0, 0),
+    )
+
+    val MOON_NEW = arrayOf(
+        intArrayOf(0, 0, 0, 0, 0, 0, 0),
+        intArrayOf(0, 0, 0, 0, 0, 0, 0),
+        intArrayOf(0, 0, 0, 0, 0, 0, 0),
+        intArrayOf(0, 0, 0, 2, 0, 0, 0),
+        intArrayOf(0, 0, 0, 0, 0, 0, 0),
+        intArrayOf(0, 0, 0, 0, 0, 0, 0),
+        intArrayOf(0, 0, 0, 0, 0, 0, 0),
+    )
+}
+
+@Composable
+fun DotMatrixPatternIcon(
+    pattern: Array<IntArray>,
+    modifier: Modifier = Modifier,
+    size: Dp = 36.dp,
+    activeColor: Color = NothingWhite,
+    inactiveColor: Color = NothingWhite20,
+    accentColor: Color = NothingRed
+) {
+    Canvas(modifier = modifier.size(size)) {
+        val rows = pattern.size
+        val cols = pattern[0].size
+        val dotRadius = (this.size.width / (cols * 2.8f))
+        val stepX = this.size.width / cols
+        val stepY = this.size.height / rows
+
+        for (r in 0 until rows) {
+            for (c in 0 until cols) {
+                val state = pattern[r][c]
+                val color = when (state) {
+                    2 -> accentColor
+                    1 -> activeColor
+                    else -> inactiveColor
+                }
+
+                val centerX = c * stepX + stepX / 2f
+                val centerY = r * stepY + stepY / 2f
+
+                drawCircle(
+                    color = color,
+                    radius = if (state > 0) dotRadius else dotRadius * 0.45f,
+                    center = Offset(centerX, centerY)
+                )
+            }
+        }
+    }
 }
 
 @Composable

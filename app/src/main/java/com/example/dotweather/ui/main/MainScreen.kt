@@ -77,6 +77,10 @@ import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.os.Build
 import android.widget.Toast
+import com.example.dotweather.ui.components.AirQualityDirectivesCard
+import com.example.dotweather.ui.components.AtmosphereGlyphBar
+import com.example.dotweather.ui.components.HourlyTrendGraph
+import com.example.dotweather.ui.components.LunarEphemerisCard
 import com.example.dotweather.widget.WeatherAirQualityWidgetProvider
 import com.example.dotweather.widget.WeatherForecastWidgetProvider
 import com.example.dotweather.widget.WeatherQuickWidgetProvider
@@ -96,16 +100,19 @@ fun MainScreen(
     val coroutineScope = rememberCoroutineScope()
     val cityStorage = remember { CityStorage(context) }
 
-    // Read the user's previously chosen active city
+    // Read the user's previously chosen active city & cached payload
     val initialActiveName = remember { cityStorage.getActiveCityName() }
     val initialActiveCountry = remember { cityStorage.getActiveCityCountry() }
+    val cachedInitial = remember { cityStorage.getCachedCityWeather() }
 
     var citiesList by remember {
         mutableStateOf(
-            WeatherRepository.getInitialFallback(initialActiveName, initialActiveCountry)
+            if (cachedInitial != null) listOf(cachedInitial)
+            else WeatherRepository.getInitialFallback(initialActiveName, initialActiveCountry)
         )
     }
     var selectedCityIndex by remember { mutableIntStateOf(0) }
+    var selectedHourIndex by remember { mutableIntStateOf(0) }
     var isCelsius by remember { mutableStateOf(cityStorage.getUnitIsCelsius()) }
     var selectedTab by remember { mutableIntStateOf(if (initialTab in 0..2) initialTab else 0) } // 0: HOURLY, 1: AIR QUALITY, 2: 7-DAY
     var isSearchExpanded by remember { mutableStateOf(false) }
@@ -115,9 +122,10 @@ fun MainScreen(
     var isLocating by remember { mutableStateOf(false) }
     var networkErrorMsg by remember { mutableStateOf<String?>(null) }
 
-    // Synchronize home screen widgets with current telemetry
+    // Synchronize home screen widgets & offline cache with current telemetry
     fun syncWidgets(city: CityWeather, celsius: Boolean) {
         try {
+            cityStorage.saveCachedCityWeather(city)
             WidgetDataStorage.saveLatestWeather(context, city, celsius)
             WidgetUpdateManager.updateAllWidgets(context)
         } catch (e: Exception) {
@@ -615,6 +623,7 @@ fun MainScreen(
                                             val newActive = citiesList.getOrNull(selectedCityIndex)
                                             if (newActive != null) {
                                                 cityStorage.setActiveCity(newActive.cityName, newActive.country, newActive.latitude, newActive.longitude)
+                                                syncWidgets(newActive, isCelsius)
                                             }
                                         }
                                     }
@@ -735,6 +744,15 @@ fun MainScreen(
             }
         }
 
+        // --- 3.1 NOTHING GLYPH ATMOSPHERE PULSE BAR ---
+        item {
+            AtmosphereGlyphBar(
+                pressureHpa = currentCity.pressureHpa,
+                windSpeed = currentCity.windSpeed,
+                condition = currentCity.condition
+            )
+        }
+
         // --- 4. TAB SELECTOR (HOURLY / AIR QUALITY / 7-DAY) ---
         item {
             Row(
@@ -775,6 +793,19 @@ fun MainScreen(
         // --- 5. TAB CONTENT ---
         when (selectedTab) {
             0 -> {
+                // HOURLY INTERACTIVE TREND GRAPH
+                item {
+                    HourlyTrendGraph(
+                        hourly = currentCity.hourly,
+                        isCelsius = isCelsius,
+                        selectedHourIndex = selectedHourIndex,
+                        onSelectHour = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            selectedHourIndex = it
+                        }
+                    )
+                }
+
                 // HOURLY TIMELINE
                 item {
                     Text(
@@ -791,10 +822,17 @@ fun MainScreen(
                             .horizontalScroll(rememberScrollState()),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        currentCity.hourly.forEach { hour ->
+                        currentCity.hourly.forEachIndexed { hIdx, hour ->
+                            val isHourSelected = hIdx == selectedHourIndex
                             val hourTemp = if (isCelsius) hour.temp else (hour.temp * 9 / 5 + 32)
                             NothingCard(
-                                modifier = Modifier.width(96.dp),
+                                modifier = Modifier
+                                    .width(96.dp)
+                                    .clickable {
+                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        selectedHourIndex = hIdx
+                                    },
+                                borderColor = if (isHourSelected) NothingRed else NothingCardBorder,
                                 cornerRadius = 20.dp
                             ) {
                                 Column(
@@ -803,8 +841,9 @@ fun MainScreen(
                                 ) {
                                     Text(
                                         text = hour.time,
-                                        color = NothingWhite40,
+                                        color = if (isHourSelected) NothingRed else NothingWhite40,
                                         fontFamily = FontFamily.Monospace,
+                                        fontWeight = if (isHourSelected) FontWeight.Bold else FontWeight.Normal,
                                         fontSize = 11.sp
                                     )
                                     Spacer(modifier = Modifier.height(10.dp))
@@ -1000,6 +1039,11 @@ fun MainScreen(
                         }
                     }
                 }
+
+                // ASTRONOMICAL LUNAR EPHEMERIS
+                item {
+                    LunarEphemerisCard()
+                }
             }
 
             1 -> {
@@ -1072,6 +1116,11 @@ fun MainScreen(
                             }
                         }
                     }
+                }
+
+                // ACTIONABLE HEALTH & ENVIRONMENTAL DIRECTIVES
+                item {
+                    AirQualityDirectivesCard(airQuality = currentCity.airQuality)
                 }
             }
 

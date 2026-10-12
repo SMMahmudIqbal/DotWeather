@@ -11,8 +11,8 @@ android {
         applicationId = "com.mahmud.dotweather"
         minSdk = 24
         targetSdk = 36
-        versionCode = 5
-        versionName = "1.7.0"
+        versionCode = 6
+        versionName = "1.8.0"
     }
 
     buildTypes {
