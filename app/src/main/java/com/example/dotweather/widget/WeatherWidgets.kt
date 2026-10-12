@@ -6,12 +6,15 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.os.Bundle
+import android.util.Log
 import android.widget.RemoteViews
 import com.example.dotweather.MainActivity
 import com.example.dotweather.R
-import com.example.dotweather.ui.components.WeatherCondition
 
 // Author Attribution: Developed by S. M. Mahmud Iqbal
+
+private const val TAG = "WeatherWidgets"
 
 /**
  * 1. Minimalist Weather Squircle / Pill Widget (2x2)
@@ -21,6 +24,37 @@ class WeatherQuickWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         val snapshot = WidgetDataStorage.loadLatestWeather(context)
         for (appWidgetId in appWidgetIds) {
+            try {
+                val views = buildRemoteViews(context, appWidgetId, snapshot)
+                appWidgetManager.updateAppWidget(appWidgetId, views)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updating QuickWidget #$appWidgetId", e)
+            }
+        }
+    }
+
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle?
+    ) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        val snapshot = WidgetDataStorage.loadLatestWeather(context)
+        try {
+            val views = buildRemoteViews(context, appWidgetId, snapshot)
+            appWidgetManager.updateAppWidget(appWidgetId, views)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error onAppWidgetOptionsChanged QuickWidget #$appWidgetId", e)
+        }
+    }
+
+    companion object {
+        fun buildRemoteViews(
+            context: Context,
+            appWidgetId: Int,
+            snapshot: WidgetWeatherSnapshot
+        ): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.widget_quick_weather)
 
             val displayTemp = if (snapshot.isCelsius) snapshot.currentTemp else (snapshot.currentTemp * 9 / 5 + 32)
@@ -35,8 +69,12 @@ class WeatherQuickWidgetProvider : AppWidgetProvider() {
             views.setTextViewText(R.id.widget_quick_range, "H:$displayHigh° L:$displayLow°")
 
             // Render crisp Nothing OS 7x7 dot-matrix bitmap
-            val iconBitmap = DotMatrixWidgetRenderer.renderConditionBitmap(snapshot.condition, sizePx = 180)
-            views.setImageViewBitmap(R.id.widget_quick_icon, iconBitmap)
+            try {
+                val iconBitmap = DotMatrixWidgetRenderer.renderConditionBitmap(snapshot.condition, sizePx = 180)
+                views.setImageViewBitmap(R.id.widget_quick_icon, iconBitmap)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed to render dot matrix icon", e)
+            }
 
             // Click opens app to active city
             val intent = Intent(context, MainActivity::class.java).apply {
@@ -50,7 +88,7 @@ class WeatherQuickWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widget_quick_root, pendingIntent)
 
-            appWidgetManager.updateAppWidget(appWidgetId, views)
+            return views
         }
     }
 }
@@ -63,6 +101,37 @@ class WeatherForecastWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         val snapshot = WidgetDataStorage.loadLatestWeather(context)
         for (appWidgetId in appWidgetIds) {
+            try {
+                val views = buildRemoteViews(context, appWidgetId, snapshot)
+                appWidgetManager.updateAppWidget(appWidgetId, views)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updating ForecastWidget #$appWidgetId", e)
+            }
+        }
+    }
+
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle?
+    ) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        val snapshot = WidgetDataStorage.loadLatestWeather(context)
+        try {
+            val views = buildRemoteViews(context, appWidgetId, snapshot)
+            appWidgetManager.updateAppWidget(appWidgetId, views)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error onAppWidgetOptionsChanged ForecastWidget #$appWidgetId", e)
+        }
+    }
+
+    companion object {
+        fun buildRemoteViews(
+            context: Context,
+            appWidgetId: Int,
+            snapshot: WidgetWeatherSnapshot
+        ): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.widget_forecast_strip)
 
             val currentTemp = if (snapshot.isCelsius) snapshot.currentTemp else (snapshot.currentTemp * 9 / 5 + 32)
@@ -104,8 +173,12 @@ class WeatherForecastWidgetProvider : AppWidgetProvider() {
                     views.setTextViewText(tempViews[i], "$itemTemp°")
                     views.setTextViewText(popViews[i], "${item.precipChance}%")
 
-                    val miniBitmap = DotMatrixWidgetRenderer.renderConditionBitmap(item.condition, sizePx = 90)
-                    views.setImageViewBitmap(iconViews[i], miniBitmap)
+                    try {
+                        val miniBitmap = DotMatrixWidgetRenderer.renderConditionBitmap(item.condition, sizePx = 90)
+                        views.setImageViewBitmap(iconViews[i], miniBitmap)
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed mini condition icon at index $i", e)
+                    }
                 }
             }
 
@@ -121,7 +194,7 @@ class WeatherForecastWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widget_forecast_root, pendingIntent)
 
-            appWidgetManager.updateAppWidget(appWidgetId, views)
+            return views
         }
     }
 }
@@ -134,14 +207,49 @@ class WeatherAirQualityWidgetProvider : AppWidgetProvider() {
     override fun onUpdate(context: Context, appWidgetManager: AppWidgetManager, appWidgetIds: IntArray) {
         val snapshot = WidgetDataStorage.loadLatestWeather(context)
         for (appWidgetId in appWidgetIds) {
+            try {
+                val views = buildRemoteViews(context, appWidgetId, snapshot)
+                appWidgetManager.updateAppWidget(appWidgetId, views)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error updating AirQualityWidget #$appWidgetId", e)
+            }
+        }
+    }
+
+    override fun onAppWidgetOptionsChanged(
+        context: Context,
+        appWidgetManager: AppWidgetManager,
+        appWidgetId: Int,
+        newOptions: Bundle?
+    ) {
+        super.onAppWidgetOptionsChanged(context, appWidgetManager, appWidgetId, newOptions)
+        val snapshot = WidgetDataStorage.loadLatestWeather(context)
+        try {
+            val views = buildRemoteViews(context, appWidgetId, snapshot)
+            appWidgetManager.updateAppWidget(appWidgetId, views)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error onAppWidgetOptionsChanged AirQualityWidget #$appWidgetId", e)
+        }
+    }
+
+    companion object {
+        fun buildRemoteViews(
+            context: Context,
+            appWidgetId: Int,
+            snapshot: WidgetWeatherSnapshot
+        ): RemoteViews {
             val views = RemoteViews(context.packageName, R.layout.widget_air_quality)
 
             views.setTextViewText(R.id.widget_aqi_badge, snapshot.aqiStatus.uppercase())
             views.setTextViewText(R.id.widget_aqi_val, snapshot.aqi.toString())
 
             // Gauge bitmap
-            val gaugeBitmap = DotMatrixWidgetRenderer.renderAqiGaugeBitmap(snapshot.aqi, sizePx = 140)
-            views.setImageViewBitmap(R.id.widget_aqi_meter, gaugeBitmap)
+            try {
+                val gaugeBitmap = DotMatrixWidgetRenderer.renderAqiGaugeBitmap(snapshot.aqi, sizePx = 140)
+                views.setImageViewBitmap(R.id.widget_aqi_meter, gaugeBitmap)
+            } catch (e: Exception) {
+                Log.e(TAG, "Failed gauge bitmap", e)
+            }
 
             // Environmental metrics
             views.setTextViewText(R.id.widget_aqi_pm25, "${snapshot.pm25} µg")
@@ -161,7 +269,7 @@ class WeatherAirQualityWidgetProvider : AppWidgetProvider() {
             )
             views.setOnClickPendingIntent(R.id.widget_aqi_root, pendingIntent)
 
-            appWidgetManager.updateAppWidget(appWidgetId, views)
+            return views
         }
     }
 }

@@ -35,8 +35,8 @@ A hyper-minimalist Android weather and environmental sensor monitor inspired by 
 ## 📦 Download Latest APK Release
 
 Download the official signed release APK from the GitHub Releases tab:
-- **Latest Release**: [v1.8.0 (GitHub Release)](https://github.com/SMMahmudIqbal/DotWeather/releases/latest)
-- **Asset**: `DotWeather-v1.8.0.apk`
+- **Latest Release**: [v1.8.1 (GitHub Release)](https://github.com/SMMahmudIqbal/DotWeather/releases/latest)
+- **Asset**: `DotWeather-v1.8.1.apk`
 
 ---
 

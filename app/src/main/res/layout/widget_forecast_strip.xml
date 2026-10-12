@@ -27,7 +27,7 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="8dp"
             android:text="DHAKA"
-            android:textColor="@color/nothing_white"
+            android:textColor="#FFFFFF"
             android:textSize="11sp"
             android:textStyle="bold"
             android:typeface="monospace" />
@@ -38,7 +38,7 @@
             android:layout_marginStart="6dp"
             android:layout_weight="1"
             android:text="// HOURLY TIMELINE"
-            android:textColor="@color/nothing_white_40"
+            android:textColor="#66FFFFFF"
             android:textSize="9sp"
             android:typeface="monospace" />
 
@@ -47,16 +47,17 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="32°"
-            android:textColor="@color/nothing_white"
+            android:textColor="#FFFFFF"
             android:textSize="11sp"
             android:textStyle="bold"
             android:typeface="monospace" />
     </LinearLayout>
 
-    <View
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1"
+        android:orientation="horizontal" />
 
     <!-- 4-Column Timeline -->
     <LinearLayout
@@ -78,7 +79,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="NOW"
-                android:textColor="@color/nothing_white_50"
+                android:textColor="#80FFFFFF"
                 android:textSize="9sp"
                 android:typeface="monospace" />
 
@@ -96,7 +97,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="32°"
-                android:textColor="@color/nothing_white"
+                android:textColor="#FFFFFF"
                 android:textSize="12sp"
                 android:textStyle="bold"
                 android:typeface="monospace" />
@@ -107,15 +108,16 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="0%"
-                android:textColor="@color/nothing_white_40"
+                android:textColor="#66FFFFFF"
                 android:textSize="8sp"
                 android:typeface="monospace" />
         </LinearLayout>
 
-        <View
+        <ImageView
             android:layout_width="1dp"
             android:layout_height="48dp"
-            android:background="@drawable/widget_divider" />
+            android:contentDescription="Divider"
+            android:src="@drawable/widget_divider" />
 
         <!-- Hour 1 -->
         <LinearLayout
@@ -130,7 +132,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="+1H"
-                android:textColor="@color/nothing_white_50"
+                android:textColor="#80FFFFFF"
                 android:textSize="9sp"
                 android:typeface="monospace" />
 
@@ -148,7 +150,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="32°"
-                android:textColor="@color/nothing_white"
+                android:textColor="#FFFFFF"
                 android:textSize="12sp"
                 android:textStyle="bold"
                 android:typeface="monospace" />
@@ -159,15 +161,16 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="0%"
-                android:textColor="@color/nothing_white_40"
+                android:textColor="#66FFFFFF"
                 android:textSize="8sp"
                 android:typeface="monospace" />
         </LinearLayout>
 
-        <View
+        <ImageView
             android:layout_width="1dp"
             android:layout_height="48dp"
-            android:background="@drawable/widget_divider" />
+            android:contentDescription="Divider"
+            android:src="@drawable/widget_divider" />
 
         <!-- Hour 2 -->
         <LinearLayout
@@ -182,7 +185,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="+2H"
-                android:textColor="@color/nothing_white_50"
+                android:textColor="#80FFFFFF"
                 android:textSize="9sp"
                 android:typeface="monospace" />
 
@@ -200,7 +203,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="31°"
-                android:textColor="@color/nothing_white"
+                android:textColor="#FFFFFF"
                 android:textSize="12sp"
                 android:textStyle="bold"
                 android:typeface="monospace" />
@@ -211,15 +214,16 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="5%"
-                android:textColor="@color/nothing_white_40"
+                android:textColor="#66FFFFFF"
                 android:textSize="8sp"
                 android:typeface="monospace" />
         </LinearLayout>
 
-        <View
+        <ImageView
             android:layout_width="1dp"
             android:layout_height="48dp"
-            android:background="@drawable/widget_divider" />
+            android:contentDescription="Divider"
+            android:src="@drawable/widget_divider" />
 
         <!-- Hour 3 -->
         <LinearLayout
@@ -234,7 +238,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="+3H"
-                android:textColor="@color/nothing_white_50"
+                android:textColor="#80FFFFFF"
                 android:textSize="9sp"
                 android:typeface="monospace" />
 
@@ -252,7 +256,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="29°"
-                android:textColor="@color/nothing_white"
+                android:textColor="#FFFFFF"
                 android:textSize="12sp"
                 android:textStyle="bold"
                 android:typeface="monospace" />
@@ -263,7 +267,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="2dp"
                 android:text="10%"
-                android:textColor="@color/nothing_white_40"
+                android:textColor="#66FFFFFF"
                 android:textSize="8sp"
                 android:typeface="monospace" />
         </LinearLayout>

@@ -76,6 +76,7 @@ import kotlinx.coroutines.launch
 import android.appwidget.AppWidgetManager
 import android.content.ComponentName
 import android.os.Build
+import android.os.Bundle
 import android.widget.Toast
 import com.example.dotweather.ui.components.AirQualityDirectivesCard
 import com.example.dotweather.ui.components.AtmosphereGlyphBar
@@ -1226,12 +1227,25 @@ fun MainScreen(
                 currentCity = currentCity,
                 isCelsius = isCelsius,
                 onPinWidget = { providerClass ->
+                    syncWidgets(currentCity, isCelsius)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         val appWidgetManager = AppWidgetManager.getInstance(context)
                         if (appWidgetManager.isRequestPinAppWidgetSupported) {
                             val provider = ComponentName(context, providerClass)
-                            appWidgetManager.requestPinAppWidget(provider, null, null)
-                            Toast.makeText(context, "PINNING WIDGET TO HOME SCREEN...", Toast.LENGTH_SHORT).show()
+                            val snapshot = WidgetDataStorage.loadLatestWeather(context)
+                            val previewViews = when (providerClass) {
+                                WeatherForecastWidgetProvider::class.java ->
+                                    WeatherForecastWidgetProvider.buildRemoteViews(context, 0, snapshot)
+                                WeatherAirQualityWidgetProvider::class.java ->
+                                    WeatherAirQualityWidgetProvider.buildRemoteViews(context, 0, snapshot)
+                                else ->
+                                    WeatherQuickWidgetProvider.buildRemoteViews(context, 0, snapshot)
+                            }
+                            val extras = Bundle().apply {
+                                putParcelable(AppWidgetManager.EXTRA_APPWIDGET_PREVIEW, previewViews)
+                            }
+                            appWidgetManager.requestPinAppWidget(provider, extras, null)
+                            Toast.makeText(context, "PINNING NOTHING WIDGET TO HOME SCREEN...", Toast.LENGTH_SHORT).show()
                         } else {
                             Toast.makeText(context, "LAUNCHER PINNING NOT SUPPORTED. TOUCH & HOLD HOME SCREEN TO ADD.", Toast.LENGTH_LONG).show()
                         }

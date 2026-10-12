@@ -30,7 +30,7 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:text="DHAKA // BD"
-            android:textColor="@color/nothing_white"
+            android:textColor="#FFFFFF"
             android:textSize="12sp"
             android:textStyle="bold"
             android:typeface="monospace" />
@@ -40,15 +40,16 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="LIVE"
-            android:textColor="@color/nothing_white_40"
+            android:textColor="#66FFFFFF"
             android:textSize="9sp"
             android:typeface="monospace" />
     </LinearLayout>
 
-    <View
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1"
+        android:orientation="horizontal" />
 
     <!-- Center Temperature & Dot-Matrix Icon Row -->
     <LinearLayout
@@ -70,16 +71,17 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="12dp"
             android:text="32°"
-            android:textColor="@color/nothing_white"
+            android:textColor="#FFFFFF"
             android:textSize="36sp"
             android:textStyle="bold"
             android:typeface="monospace" />
     </LinearLayout>
 
-    <View
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1"
+        android:orientation="horizontal" />
 
     <!-- Bottom Condition & Range Row -->
     <LinearLayout
@@ -96,7 +98,7 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:text="SUNNY / CLEAR"
-            android:textColor="@color/nothing_white_70"
+            android:textColor="#B3FFFFFF"
             android:textSize="10sp"
             android:typeface="monospace" />
 
@@ -110,7 +112,7 @@
             android:paddingEnd="8dp"
             android:paddingBottom="3dp"
             android:text="H:34° L:25°"
-            android:textColor="@color/nothing_white_50"
+            android:textColor="#80FFFFFF"
             android:textSize="9sp"
             android:typeface="monospace" />
     </LinearLayout>

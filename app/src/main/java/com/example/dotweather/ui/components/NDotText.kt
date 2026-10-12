@@ -1,7 +1,7 @@
 package com.example.dotweather.ui.components
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.Composable
@@ -188,7 +188,7 @@ fun NDotText(
     accentCharIndex: Int = -1,
     accentColor: Color = NothingRed
 ) {
-    BoxWithConstraints(
+    Box(
         modifier = modifier
             .fillMaxWidth()
             .height(height)
