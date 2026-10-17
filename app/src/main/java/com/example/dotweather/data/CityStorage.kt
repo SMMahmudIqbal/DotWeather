@@ -51,7 +51,8 @@ class CityStorage(context: Context) {
                         lat = obj.getDouble("lat"),
                         lon = obj.getDouble("lon"),
                         isCustom = obj.optBoolean("isCustom", true),
-                        isGps = obj.optBoolean("isGps", false)
+                        // Older versions labeled IP estimates as GPS; no GPS provider is implemented.
+                        isGps = false
                     )
                 )
             }
@@ -226,7 +227,8 @@ class CityStorage(context: Context) {
                 hourly = hourly,
                 daily = daily,
                 isCustomLocation = obj.optBoolean("isCustomLocation", true),
-                isGpsLocation = obj.optBoolean("isGpsLocation", false),
+                // Older versions mislabeled IP estimates as GPS; normalize cached data.
+                isGpsLocation = false,
                 latitude = obj.optDouble("latitude", 0.0),
                 longitude = obj.optDouble("longitude", 0.0),
                 lastUpdated = obj.optString("lastUpdated", "CACHED")
