@@ -108,7 +108,7 @@ object WeatherRepository {
                     DailyForecast("TOMORROW", 25, 33, WeatherCondition.PARTLY_CLOUDY)
                 ),
                 isCustomLocation = true,
-                isGpsLocation = true,
+                isGpsLocation = false,
                 lastUpdated = "JUST NOW"
             )
         )

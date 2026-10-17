@@ -192,7 +192,7 @@ fun MainScreen(
                     latitude = detected.latitude,
                     longitude = detected.longitude,
                     isCustom = true,
-                    isGps = true
+                    isGps = false
                 )
                 if (liveWeather != null) {
                     val filtered = citiesList.filterNot { it.cityName == liveWeather.cityName && it.country == liveWeather.country }
@@ -236,7 +236,7 @@ fun MainScreen(
                             lat = activeLat,
                             lon = activeLon,
                             isCustom = true,
-                            isGps = true
+                            isGps = false
                         )
                     )
                 }
@@ -251,7 +251,7 @@ fun MainScreen(
                             lat = autoLoc.latitude,
                             lon = autoLoc.longitude,
                             isCustom = true,
-                            isGps = true
+                            isGps = false
                         )
                     )
                     cityStorage.setActiveCity(autoLoc.name, autoLoc.country, autoLoc.latitude, autoLoc.longitude)

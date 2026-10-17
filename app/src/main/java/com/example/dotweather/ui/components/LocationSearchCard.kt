@@ -53,7 +53,7 @@ import com.example.dotweather.theme.NothingWhite70
 // Author Attribution: Developed by S. M. Mahmud Iqbal
 
 /**
- * Nothing OS stylized location search bar, live GPS detection trigger, and search results list.
+ * Nothing OS stylized location search bar, approximate IP-location trigger, and search results list.
  */
 @Composable
 fun LocationSearchCard(
@@ -151,7 +151,7 @@ fun LocationSearchCard(
                             letterSpacing = 0.8.sp
                         )
                         Text(
-                            text = "Instant GPS & IP telemetry sensor",
+                            text = "Approximate IP location · not GPS",
                             color = NothingWhite40,
                             fontFamily = FontFamily.Monospace,
                             fontSize = 10.sp

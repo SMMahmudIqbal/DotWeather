@@ -14,8 +14,8 @@ import java.util.Locale
 // Author Attribution: Developed by S. M. Mahmud Iqbal
 
 /**
- * Live Weather API Client using Open-Meteo & Open-Meteo Geocoding APIs + IP Geolocation.
- * 100% Free, no API key required, high precision global weather & air quality telemetry.
+ * Live Weather API client using Open-Meteo and approximate HTTPS IP geolocation.
+ * IP-derived locations are estimates and are not device GPS coordinates.
  */
 object WeatherApiClient {
 
@@ -101,44 +101,25 @@ object WeatherApiClient {
         list
     }
 
-    /**
-     * Instantly auto-detects current device location via high-speed IP Geolocation
-     */
+    /** Returns an approximate network location over HTTPS; this is not device GPS. */
     suspend fun detectCurrentLocation(): GeoResult? = withContext(Dispatchers.IO) {
         try {
             val resp = httpGet("https://ipwho.is/")
             val json = JSONObject(resp)
-            if (json.optBoolean("success", true)) {
-                val city = json.optString("city", "").trim()
-                val country = json.optString("country_code", json.optString("country", "")).trim()
-                val lat = json.optDouble("latitude", Double.NaN)
-                val lon = json.optDouble("longitude", Double.NaN)
-                val region = json.optString("region", "")
-                if (city.isNotEmpty() && !lat.isNaN() && !lon.isNaN()) {
-                    return@withContext GeoResult(city.uppercase(), country.uppercase(), lat, lon, region.uppercase())
-                }
+            if (!json.optBoolean("success", false)) return@withContext null
+            val city = json.optString("city", "").trim()
+            val country = json.optString("country_code", json.optString("country", "")).trim()
+            val lat = json.optDouble("latitude", Double.NaN)
+            val lon = json.optDouble("longitude", Double.NaN)
+            val region = json.optString("region", "")
+            if (city.isNotEmpty() && !lat.isNaN() && !lon.isNaN()) {
+                GeoResult(city.uppercase(), country.uppercase(), lat, lon, region.uppercase())
+            } else {
+                null
             }
         } catch (e: Exception) {
-            // fallback
+            null
         }
-
-        try {
-            val resp = httpGet("http://ip-api.com/json/")
-            val json = JSONObject(resp)
-            if (json.optString("status") == "success") {
-                val city = json.optString("city", "").trim()
-                val country = json.optString("countryCode", "").trim()
-                val lat = json.optDouble("lat", Double.NaN)
-                val lon = json.optDouble("lon", Double.NaN)
-                val region = json.optString("regionName", "")
-                if (city.isNotEmpty() && !lat.isNaN() && !lon.isNaN()) {
-                    return@withContext GeoResult(city.uppercase(), country.uppercase(), lat, lon, region.uppercase())
-                }
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-        null
     }
 
     /**
