@@ -19,7 +19,7 @@ A hyper-minimalist Android weather and environmental sensor monitor inspired by 
   3. **Environmental & AQI Hub (2x2)**: Sensor dashboard featuring real-time numeric AQI score, procedural circular dot-matrix LED gauge, PM2.5, wind speed/direction, humidity, and UV index.
 - **⚡ Clean UI Experience**: In-app UI remains completely clean and clutter-free. Widgets are accessible exclusively via standard Android home screen widget selection (touch and hold / long-press any empty space on your home screen or long-press the DotWeather app icon).
 - **📍 Default Active Location Persistence**: Remembers your chosen city and default temperature unit across app restarts and background termination.
-- **🧭 Auto-Detect Location**: Instant GPS & IP-based automatic device geolocation detecting your exact city anywhere worldwide on launch.
+- **🧭 Auto-Detect Location**: An approximate city-level estimate based on your public IP address; it is not GPS and may identify a nearby or otherwise inaccurate city.
 - **🌍 Live Global Telemetry**: 100% real-time weather and air quality data powered by Open-Meteo (no API keys required, ultra-fast response).
 - **🔍 Multi-Result Geocoding Search**: Search any city worldwide with real-time multi-result matching, state/region information, and 1-tap addition.
 - **☀️ Astronomical Solar Cycle**: Precise sunrise and sunset dawn/dusk orbits with daylight duration tracker and celestial visual progress.
@@ -47,5 +47,5 @@ Download the official signed release APK from the GitHub Releases tab:
 - **Language**: Kotlin 2.2+ & Coroutines (Parallel Telemetry Fetching)
 - **Components**: `AtmosphereGlyphBar`, `HourlyTrendGraph`, `LunarEphemerisCard`, `AirQualityDirectivesCard`
 - **Widgets**: `WeatherQuickWidgetProvider` (2x2), `WeatherForecastWidgetProvider` (4x2), `WeatherAirQualityWidgetProvider` (2x2)
-- **APIs**: Open-Meteo Weather, Open-Meteo Air Quality, Open-Meteo Geocoding, IP Geolocation
+- **APIs**: Open-Meteo Weather, Open-Meteo Air Quality, Open-Meteo Geocoding, and HTTPS IP geolocation via ipwho.is (which receives the network request and can estimate location from its source IP)
 - **Developer**: S. M. Mahmud Iqbal
